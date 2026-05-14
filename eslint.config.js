@@ -78,6 +78,7 @@ export default defineConfigWithVueTs(
     {
         ignores: [
             'vendor',
+            '.agents',
             'node_modules',
             'public',
             'bootstrap/ssr',
