@@ -41,19 +41,19 @@ class CampaignController extends Controller
         return Inertia::render('Campaigns/Index', ['campaigns' => $this->pagination($campaigns), 'filters' => $request->only(['search', 'status', 'provider', 'per_page'])]);
     }
 
-    public function builder(): Response
+    public function builder(EmailPersonalizer $personalizer): Response
     {
-        return Inertia::render('Campaigns/Builder', $this->builderProps());
+        return Inertia::render('Campaigns/Builder', $this->builderProps(null, $personalizer));
     }
 
-    public function create(): Response
+    public function create(EmailPersonalizer $personalizer): Response
     {
-        return $this->builder();
+        return Inertia::render('Campaigns/Builder', $this->builderProps(null, $personalizer));
     }
 
     public function store(CampaignRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $this->withUnsubscribeToken($request->validated());
         $data['created_by'] = $request->user()->id;
         $data['status'] = $data['status'] ?? 'draft';
         $campaign = EmailCampaign::create($data);
@@ -63,33 +63,49 @@ class CampaignController extends Controller
 
     public function show(EmailCampaign $campaign): Response
     {
+        $preparedCount = $campaign->recipients()->count();
+        $sendableCount = app(AudienceResolver::class)->queryForCampaign($campaign)->count();
+
         return Inertia::render('Campaigns/Show', [
             'campaign' => $campaign->loadCount('recipients'),
             'recipients' => $campaign->recipients()->latest()->limit(20)->get(),
+            'audience' => [
+                'prepared_count' => $preparedCount,
+                'sendable_count' => $sendableCount,
+                'display_count' => $preparedCount > 0 ? $preparedCount : $sendableCount,
+            ],
+            'actions' => $this->campaignActions($campaign),
         ]);
     }
 
-    public function preview(EmailCampaign $campaign, EmailPreviewDocument $preview): HttpResponse
+    public function preview(EmailCampaign $campaign, EmailPreviewDocument $preview, EmailPersonalizer $personalizer): HttpResponse
     {
-        return $preview->response((string) $campaign->html_body);
+        $metadataKeys = $personalizer->metadataKeysFromContacts();
+
+        return $preview->response(
+            $personalizer->renderSample((string) $campaign->html_body, $metadataKeys),
+            $personalizer->renderSample((string) $campaign->preheader, $metadataKeys),
+        );
     }
 
-    public function edit(EmailCampaign $campaign): Response
+    public function edit(EmailCampaign $campaign, EmailPersonalizer $personalizer): Response
     {
-        return Inertia::render('Campaigns/Builder', $this->builderProps($campaign));
+        abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be edited.');
+
+        return Inertia::render('Campaigns/Builder', $this->builderProps($campaign, $personalizer));
     }
 
     public function update(CampaignRequest $request, EmailCampaign $campaign): RedirectResponse
     {
         abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be edited.');
-        $campaign->update($request->validated());
+        $campaign->update($this->withUnsubscribeToken($request->validated()));
 
         return back()->with('success', 'Campaign updated.');
     }
 
     public function destroy(EmailCampaign $campaign): RedirectResponse
     {
-        abort_if(in_array($campaign->status, ['queued', 'preparing', 'sending'], true), 422, 'Pause or cancel the campaign before deleting.');
+        abort_if(in_array($campaign->status, ['queued', 'preparing', 'sending', 'paused'], true), 422, 'Cancel the campaign before deleting.');
         $campaign->delete();
 
         return redirect()->route('campaigns.index')->with('success', 'Campaign deleted.');
@@ -123,23 +139,33 @@ class CampaignController extends Controller
 
     public function send(CampaignSendRequest $request, EmailCampaign $campaign, AudienceResolver $resolver, EmailPersonalizer $personalizer): RedirectResponse
     {
-        $warnings = $personalizer->unresolvedVariables(($campaign->subject ?? '').($campaign->html_body ?? '').($campaign->text_body ?? ''));
+        abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be sent.');
+
+        $campaign->update($this->withUnsubscribeToken([
+            'html_body' => $campaign->html_body,
+            'text_body' => $campaign->text_body,
+        ]));
+        $campaign->refresh();
+
+        $content = $this->personalizableContent($campaign);
+        $warnings = $personalizer->unresolvedVariables($content, $personalizer->metadataKeysFromContacts());
         if ($warnings) {
             return back()->withErrors(['campaign' => 'Unresolved variables remain: '.implode(', ', $warnings)]);
-        }
-
-        if (! str_contains((string) $campaign->html_body.(string) $campaign->text_body, 'unsubscribe')) {
-            return back()->withErrors(['campaign' => 'Marketing email requires an unsubscribe link.']);
         }
 
         if ($resolver->queryForCampaign($campaign)->count() < 1) {
             return back()->withErrors(['campaign' => 'Audience is empty.']);
         }
 
-        $campaign->update(['status' => $request->filled('scheduled_at') ? 'scheduled' : 'queued', 'scheduled_at' => $request->date('scheduled_at')]);
+        $recipientMode = $request->string('recipient_mode')->toString() ?: 'current_audience';
+        $campaign->update([
+            'status' => $request->filled('scheduled_at') ? 'scheduled' : 'queued',
+            'scheduled_at' => $request->date('scheduled_at'),
+            'recipient_mode' => $recipientMode,
+        ]);
 
         if (! $request->filled('scheduled_at')) {
-            PrepareEmailCampaignRecipients::dispatch($campaign->id)->onQueue('email');
+            PrepareEmailCampaignRecipients::dispatch($campaign->id, $recipientMode)->onQueue('email');
         }
 
         return back()->with('success', $request->filled('scheduled_at') ? 'Campaign scheduled.' : 'Campaign queued.');
@@ -147,6 +173,8 @@ class CampaignController extends Controller
 
     public function pause(EmailCampaign $campaign): RedirectResponse
     {
+        abort_unless(in_array($campaign->status, ['queued', 'preparing', 'sending'], true), 422, 'Only active campaigns can be paused.');
+
         $campaign->update(['status' => 'paused']);
 
         return back()->with('success', 'Campaign paused.');
@@ -154,14 +182,18 @@ class CampaignController extends Controller
 
     public function resume(EmailCampaign $campaign): RedirectResponse
     {
+        abort_unless($campaign->status === 'paused', 422, 'Only paused campaigns can be resumed.');
+
         $campaign->update(['status' => 'queued']);
-        PrepareEmailCampaignRecipients::dispatch($campaign->id)->onQueue('email');
+        PrepareEmailCampaignRecipients::dispatch($campaign->id, $campaign->recipient_mode ?: 'current_audience')->onQueue('email');
 
         return back()->with('success', 'Campaign resumed.');
     }
 
     public function cancel(EmailCampaign $campaign): RedirectResponse
     {
+        abort_unless(in_array($campaign->status, ['scheduled', 'queued', 'preparing', 'sending', 'paused'], true), 422, 'Only scheduled or active campaigns can be cancelled.');
+
         $campaign->update(['status' => 'cancelled', 'completed_at' => now()]);
 
         return back()->with('success', 'Campaign cancelled.');
@@ -169,8 +201,13 @@ class CampaignController extends Controller
 
     public function resendFailed(EmailCampaign $campaign): RedirectResponse
     {
-        $campaign->recipients()->where('status', 'failed')->update(['status' => 'queued', 'error_message' => null]);
-        $campaign->recipients()->where('status', 'queued')->pluck('id')->each(fn ($id) => SendSingleEmail::dispatch($id)->onQueue('email'));
+        abort_unless(in_array($campaign->status, ['completed', 'failed'], true), 422, 'Only completed or failed campaigns can resend failed recipients.');
+
+        $failedIds = $campaign->recipients()->where('status', 'failed')->pluck('id');
+        abort_unless($failedIds->isNotEmpty(), 422, 'There are no failed recipients to resend.');
+
+        $campaign->recipients()->whereIn('id', $failedIds)->update(['status' => 'queued', 'error_message' => null]);
+        $failedIds->each(fn ($id) => SendSingleEmail::dispatch($id)->onQueue('email'));
 
         return back()->with('success', 'Failed recipients queued.');
     }
@@ -178,6 +215,7 @@ class CampaignController extends Controller
     public function resendRecipient(EmailCampaign $campaign, CampaignRecipient $recipient): RedirectResponse
     {
         abort_unless($recipient->email_campaign_id === $campaign->id, 404);
+        abort_unless(in_array($campaign->status, ['completed', 'failed'], true), 422, 'Only completed or failed campaigns can retry failed recipients.');
         abort_unless($recipient->status === 'failed', 422, 'Only failed recipients can be retried.');
         $recipient->update(['status' => 'queued', 'error_message' => null]);
         SendSingleEmail::dispatch($recipient->id)->onQueue('email');
@@ -187,19 +225,66 @@ class CampaignController extends Controller
 
     public function duplicate(EmailCampaign $campaign): RedirectResponse
     {
-        $copy = $campaign->replicate(['uuid', 'status', 'started_at', 'completed_at']);
+        $copy = $campaign->replicate([
+            'uuid',
+            'status',
+            'scheduled_at',
+            'started_at',
+            'completed_at',
+            'total_recipients',
+            'queued_count',
+            'sent_count',
+            'delivered_count',
+            'opened_count',
+            'clicked_count',
+            'failed_count',
+            'bounced_count',
+            'complained_count',
+            'skipped_count',
+            'pending_count',
+            'approved_by',
+        ]);
         $copy->name = $campaign->name.' Copy';
         $copy->status = 'draft';
+        $copy->created_by = request()->user()?->id;
         $copy->save();
 
         return redirect()->route('campaigns.edit', $copy)->with('success', 'Campaign duplicated.');
     }
 
-    public function recipients(Request $request, EmailCampaign $campaign): Response
+    public function recipients(Request $request, EmailCampaign $campaign, AudienceResolver $resolver): Response
     {
+        if (! $campaign->recipients()->exists() && in_array($campaign->status, ['draft', 'scheduled'], true)) {
+            $contacts = $resolver->queryForCampaign($campaign)
+                ->orderBy('full_name')
+                ->paginate($this->perPage($request->input('per_page')))
+                ->withQueryString()
+                ->through(fn (Contact $contact): array => [
+                    'id' => 'target-'.$contact->id,
+                    'contact_id' => $contact->id,
+                    'email_normalized' => $contact->email_normalized,
+                    'status' => 'targeted',
+                    'provider_message_id' => null,
+                    'error_message' => null,
+                    'contact' => [
+                        'id' => $contact->id,
+                        'full_name' => $contact->display_name,
+                        'email' => $contact->email,
+                        'company' => $contact->company,
+                    ],
+                ]);
+
+            return Inertia::render('Campaigns/Recipients', [
+                'campaign' => $campaign,
+                'recipients' => $this->pagination($contacts),
+                'filters' => $request->only(['status', 'per_page']),
+                'mode' => 'target_audience',
+            ]);
+        }
+
         $recipients = $campaign->recipients()->with('contact')->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))->latest()->paginate($this->perPage($request->input('per_page')))->withQueryString();
 
-        return Inertia::render('Campaigns/Recipients', ['campaign' => $campaign, 'recipients' => $this->pagination($recipients), 'filters' => $request->only(['status', 'per_page'])]);
+        return Inertia::render('Campaigns/Recipients', ['campaign' => $campaign, 'recipients' => $this->pagination($recipients), 'filters' => $request->only(['status', 'per_page']), 'mode' => 'prepared_recipients']);
     }
 
     public function report(EmailCampaign $campaign, CampaignCountRefresher $refresher): Response
@@ -212,7 +297,7 @@ class CampaignController extends Controller
         return back()->withErrors(['provider' => 'Test email requires provider configuration.']);
     }
 
-    private function builderProps(?EmailCampaign $campaign = null): array
+    private function builderProps(?EmailCampaign $campaign, EmailPersonalizer $personalizer): array
     {
         return [
             'campaign' => $campaign,
@@ -220,6 +305,7 @@ class CampaignController extends Controller
             'lists' => ListModel::active()->withCount('contacts')->orderBy('name')->get(['id', 'name']),
             'tags' => Tag::withCount('contacts')->orderBy('name')->get(['id', 'name']),
             'selectedContacts' => $this->selectedContacts($campaign),
+            'variableDefinitions' => $personalizer->variableDefinitions($personalizer->metadataKeysFromContacts()),
             'defaults' => [
                 'from_name' => config('emailora.from_name'),
                 'from_email' => config('emailora.from_email'),
@@ -227,6 +313,49 @@ class CampaignController extends Controller
                 'provider' => config('emailora.provider'),
             ],
         ];
+    }
+
+    private function campaignActions(EmailCampaign $campaign): array
+    {
+        return [
+            'canEdit' => in_array($campaign->status, ['draft', 'scheduled'], true),
+            'canSend' => in_array($campaign->status, ['draft', 'scheduled'], true),
+            'canPause' => in_array($campaign->status, ['queued', 'preparing', 'sending'], true),
+            'canResume' => $campaign->status === 'paused',
+            'canCancel' => in_array($campaign->status, ['scheduled', 'queued', 'preparing', 'sending', 'paused'], true),
+            'canDelete' => ! in_array($campaign->status, ['queued', 'preparing', 'sending', 'paused'], true),
+            'canResendFailed' => in_array($campaign->status, ['completed', 'failed'], true) && $campaign->failed_count > 0,
+        ];
+    }
+
+    private function personalizableContent(EmailCampaign $campaign): string
+    {
+        return implode("\n", [
+            (string) $campaign->subject,
+            (string) $campaign->preheader,
+            (string) $campaign->html_body,
+            (string) $campaign->text_body,
+        ]);
+    }
+
+    private function withUnsubscribeToken(array $data): array
+    {
+        $html = (string) ($data['html_body'] ?? '');
+        $text = (string) ($data['text_body'] ?? '');
+
+        if (str_contains($html.$text, 'unsubscribe_url')) {
+            return $data;
+        }
+
+        if ($html !== '') {
+            $data['html_body'] = rtrim($html)."\n".'<p style="margin-top:24px;font-size:12px;color:#64748b;">No longer want these emails? <a href="{{ unsubscribe_url }}">Unsubscribe</a>.</p>';
+        }
+
+        if ($text !== '') {
+            $data['text_body'] = rtrim($text)."\n\nUnsubscribe: {{ unsubscribe_url }}";
+        }
+
+        return $data;
     }
 
     private function selectedContacts(?EmailCampaign $campaign): array

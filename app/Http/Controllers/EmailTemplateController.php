@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\BuildsTableProps;
 use App\Http\Requests\EmailTemplateRequest;
 use App\Models\EmailTemplate;
+use App\Services\Email\EmailPersonalizer;
 use App\Services\Email\EmailPreviewDocument;
 use App\Services\Email\EmailSanitizer;
 use App\Services\Email\HtmlToText;
@@ -31,9 +32,14 @@ class EmailTemplateController extends Controller
         return Inertia::render('Templates/Index', ['templates' => $this->pagination($templates), 'filters' => $request->only(['search', 'category', 'status', 'per_page'])]);
     }
 
-    public function create(): Response
+    public function create(EmailPersonalizer $personalizer): Response
     {
-        return Inertia::render('Templates/Form', ['template' => null]);
+        $metadataKeys = $personalizer->metadataKeysFromContacts();
+
+        return Inertia::render('Templates/Form', [
+            'template' => null,
+            'variableDefinitions' => $personalizer->variableDefinitions($metadataKeys),
+        ]);
     }
 
     public function store(EmailTemplateRequest $request, EmailSanitizer $sanitizer, HtmlToText $htmlToText): RedirectResponse
@@ -52,14 +58,24 @@ class EmailTemplateController extends Controller
         return Inertia::render('Templates/Show', ['template' => $template]);
     }
 
-    public function preview(EmailTemplate $template, EmailPreviewDocument $preview): HttpResponse
+    public function preview(EmailTemplate $template, EmailPreviewDocument $preview, EmailPersonalizer $personalizer): HttpResponse
     {
-        return $preview->response((string) $template->html_body);
+        $metadataKeys = $personalizer->metadataKeysFromContacts();
+
+        return $preview->response(
+            $personalizer->renderSample((string) $template->html_body, $metadataKeys),
+            $personalizer->renderSample((string) $template->preheader, $metadataKeys),
+        );
     }
 
-    public function edit(EmailTemplate $template): Response
+    public function edit(EmailTemplate $template, EmailPersonalizer $personalizer): Response
     {
-        return Inertia::render('Templates/Form', ['template' => $template]);
+        $metadataKeys = $personalizer->metadataKeysFromContacts();
+
+        return Inertia::render('Templates/Form', [
+            'template' => $template,
+            'variableDefinitions' => $personalizer->variableDefinitions($metadataKeys),
+        ]);
     }
 
     public function update(EmailTemplateRequest $request, EmailTemplate $template, EmailSanitizer $sanitizer, HtmlToText $htmlToText): RedirectResponse

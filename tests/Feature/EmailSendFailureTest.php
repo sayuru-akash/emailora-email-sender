@@ -7,9 +7,12 @@ use App\Models\CampaignRecipient;
 use App\Models\Contact;
 use App\Models\EmailCampaign;
 use App\Models\EmailMessage;
+use App\Services\Email\BrevoProvider;
+use App\Services\Email\EmailPayload;
 use App\Services\Email\EmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -40,5 +43,39 @@ class EmailSendFailureTest extends TestCase
         $this->assertSame('failed', $recipient->status);
         $this->assertStringContainsString('API key is not configured', $recipient->error_message);
         $this->assertSame('failed', EmailMessage::first()->status);
+    }
+
+    public function test_brevo_payload_omits_empty_optional_fields(): void
+    {
+        Config::set('emailora.brevo.api_key', 'test-brevo-key');
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://api.brevo.com/v3/smtp/email' => Http::response(['messageId' => 'brevo-message-1'], 201),
+        ]);
+
+        $result = app(BrevoProvider::class)->send(new EmailPayload(
+            to: 'sayuru555@gmail.com',
+            subject: 'Test email',
+            html: '<p>Hello Sayuru</p>',
+            text: 'Hello Sayuru',
+            fromEmail: 'team@codezela.com',
+            fromName: 'Codezela Technologies',
+        ));
+
+        $this->assertTrue($result->accepted);
+
+        Http::assertSent(function ($request) {
+            $payload = $request->data();
+
+            return $request->url() === 'https://api.brevo.com/v3/smtp/email'
+                && $payload['sender'] === ['name' => 'Codezela Technologies', 'email' => 'team@codezela.com']
+                && $payload['to'] === [['email' => 'sayuru555@gmail.com']]
+                && $payload['subject'] === 'Test email'
+                && $payload['htmlContent'] === '<p>Hello Sayuru</p>'
+                && $payload['textContent'] === 'Hello Sayuru'
+                && ! array_key_exists('replyTo', $payload)
+                && ! array_key_exists('headers', $payload)
+                && ! array_key_exists('tags', $payload);
+        });
     }
 }

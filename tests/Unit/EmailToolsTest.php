@@ -18,11 +18,31 @@ class EmailToolsTest extends TestCase
             'full_name' => 'Jane Doe',
             'email' => 'jane@example.com',
             'company' => 'Example Co',
+            'metadata' => ['student_id' => 'CCA-100'],
         ]);
 
-        $html = (new EmailPersonalizer)->render('Hello {first_name} at {company}', $contact);
+        $html = (new EmailPersonalizer)->render('Hello {{ name }} at {company} / {{ metadata.student_id }} / {{ unsubscribe_url }}', $contact, [
+            'unsubscribe_url' => 'https://example.com/unsubscribe',
+        ]);
 
-        $this->assertSame('Hello Jane at Example Co', $html);
+        $this->assertSame('Hello Jane Doe at Example Co / CCA-100 / https://example.com/unsubscribe', $html);
+    }
+
+    public function test_personalizer_reports_only_unknown_variables(): void
+    {
+        $unknown = (new EmailPersonalizer)->unresolvedVariables('Hello {{ name }} {{ metadata.student_id }} {unsubscribe_url} {{ nope }}');
+
+        $this->assertSame(['nope'], $unknown);
+    }
+
+    public function test_personalizer_can_limit_metadata_variables_to_dataset_keys(): void
+    {
+        $unknown = (new EmailPersonalizer)->unresolvedVariables(
+            'Hello {{ metadata.student_id }} {{ metadata.stduent_id }}',
+            ['student_id'],
+        );
+
+        $this->assertSame(['metadata.stduent_id'], $unknown);
     }
 
     public function test_sanitizer_removes_scripts_and_event_handlers(): void

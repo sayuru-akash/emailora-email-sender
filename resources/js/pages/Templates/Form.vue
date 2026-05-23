@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Check, Code2, Eye, FileText } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
+import VariablePicker from '@/components/emailora/VariablePicker.vue';
 
-const props = defineProps<{ template?: any }>();
+type VariableDefinition = {
+    key: string;
+    token: string;
+    label: string;
+    group: string;
+    description: string;
+    sample?: string;
+};
+
+const props = defineProps<{
+    template?: any;
+    variableDefinitions?: VariableDefinition[];
+}>();
 
 const defaultHtml =
     '<p>Hello {first_name},</p><p><a href="{unsubscribe_url}">Unsubscribe</a></p>';
@@ -19,12 +32,23 @@ const form = useForm({
     status: props.template?.status ?? 'active',
 });
 
+type InsertField = 'subject' | 'preheader' | 'html_body' | 'text_body';
+
+const activeInsertField = ref<InsertField>('html_body');
+const subjectField = ref<HTMLInputElement | null>(null);
+const preheaderField = ref<HTMLTextAreaElement | null>(null);
+const htmlBodyField = ref<HTMLTextAreaElement | null>(null);
+const textBodyField = ref<HTMLTextAreaElement | null>(null);
+
 const isEditing = computed(() => Boolean(props.template?.id));
 const pageTitle = computed(() =>
     isEditing.value ? 'Edit Template' : 'Create Template',
 );
 const previewHtml = computed(() => {
-    const html = form.html_body || defaultHtml;
+    const html = withPreheader(
+        renderSampleContent(form.html_body || defaultHtml),
+        renderSampleContent(form.preheader || ''),
+    );
 
     if (/<base\s/i.test(html)) {
         return html;
@@ -47,6 +71,90 @@ const hasRequiredContent = computed(
 const saveLabel = computed(() =>
     isEditing.value ? 'Update template' : 'Create template',
 );
+const activeFieldLabel = computed(() => {
+    return {
+        subject: 'subject',
+        preheader: 'preheader',
+        html_body: 'HTML body',
+        text_body: 'plain text',
+    }[activeInsertField.value];
+});
+
+const sampleSubject = computed(() =>
+    renderSampleContent(form.subject || 'Subject'),
+);
+const samplePreheader = computed(() =>
+    renderSampleContent(form.preheader || 'No preheader set'),
+);
+
+function fieldElement(field: InsertField) {
+    return {
+        subject: subjectField.value,
+        preheader: preheaderField.value,
+        html_body: htmlBodyField.value,
+        text_body: textBodyField.value,
+    }[field];
+}
+
+function insertVariable(token: string) {
+    const field = activeInsertField.value;
+    const element = fieldElement(field);
+    const current = form[field] ?? '';
+    const start = element?.selectionStart ?? current.length;
+    const end = element?.selectionEnd ?? current.length;
+    const prefix = current.slice(0, start);
+    const suffix = current.slice(end);
+    const spacerBefore = prefix && !/\s$/.test(prefix) ? ' ' : '';
+    const spacerAfter = suffix && !/^\s/.test(suffix) ? ' ' : '';
+
+    form[field] = `${prefix}${spacerBefore}${token}${spacerAfter}${suffix}`;
+
+    requestAnimationFrame(() => {
+        const nextPosition = start + spacerBefore.length + token.length;
+        element?.focus();
+        element?.setSelectionRange(nextPosition, nextPosition);
+    });
+}
+
+function renderSampleContent(content: string) {
+    const values = new Map(
+        (props.variableDefinitions ?? []).map((definition) => [
+            definition.key,
+            definition.sample ?? '',
+        ]),
+    );
+
+    return content.replace(
+        /\{\{\s*([a-zA-Z0-9_.-]+)\s*}}|\{\s*([a-zA-Z0-9_.-]+)\s*}/g,
+        (_match, bladeKey: string | undefined, legacyKey: string | undefined) =>
+            values.get(bladeKey || legacyKey || '') ?? '',
+    );
+}
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function withPreheader(html: string, preheader: string) {
+    const cleanPreheader = preheader.trim();
+
+    if (!cleanPreheader) {
+        return html;
+    }
+
+    const node = `<div style="display:none!important;max-height:0;max-width:0;opacity:0;overflow:hidden;color:transparent;line-height:1px;mso-hide:all;">${escapeHtml(cleanPreheader)}</div>`;
+
+    if (/<body\b[^>]*>/i.test(html)) {
+        return html.replace(/(<body\b[^>]*>)/i, `$1${node}`);
+    }
+
+    return `${node}${html}`;
+}
 
 function submit() {
     const options = { preserveScroll: true };
@@ -157,9 +265,11 @@ function submit() {
                         <label class="space-y-1.5 md:col-span-2">
                             <span class="text-sm font-medium">Subject</span>
                             <input
+                                ref="subjectField"
                                 v-model="form.subject"
                                 class="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                 placeholder="Your payment reminder"
+                                @focus="activeInsertField = 'subject'"
                             />
                             <span
                                 v-if="form.errors.subject"
@@ -171,10 +281,12 @@ function submit() {
                         <label class="space-y-1.5 md:col-span-2">
                             <span class="text-sm font-medium">Preheader</span>
                             <textarea
+                                ref="preheaderField"
                                 v-model="form.preheader"
                                 class="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm"
                                 maxlength="180"
                                 placeholder="Inbox preview text"
+                                @focus="activeInsertField = 'preheader'"
                             />
                             <div
                                 class="flex items-center justify-between gap-3 text-xs text-muted-foreground"
@@ -226,9 +338,11 @@ function submit() {
                                 HTML body
                             </span>
                             <textarea
+                                ref="htmlBodyField"
                                 v-model="form.html_body"
                                 class="min-h-[520px] w-full resize-y rounded-md border bg-background px-3 py-2 font-mono text-sm leading-6"
                                 spellcheck="false"
+                                @focus="activeInsertField = 'html_body'"
                             />
                             <span
                                 v-if="form.errors.html_body"
@@ -245,9 +359,11 @@ function submit() {
                                 Plain text fallback
                             </span>
                             <textarea
+                                ref="textBodyField"
                                 v-model="form.text_body"
                                 class="min-h-40 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm leading-6"
                                 placeholder="Optional fallback for clients that do not render HTML"
+                                @focus="activeInsertField = 'text_body'"
                             />
                             <span
                                 v-if="form.errors.text_body"
@@ -266,7 +382,7 @@ function submit() {
                                 <p
                                     class="truncate text-sm text-muted-foreground"
                                 >
-                                    {{ form.preheader || 'No preheader set' }}
+                                    {{ samplePreheader }}
                                 </p>
                             </div>
                             <Eye class="h-5 w-5 text-primary" />
@@ -274,7 +390,7 @@ function submit() {
 
                         <div class="mt-4 rounded-md border bg-background p-3">
                             <div class="truncate text-sm font-medium">
-                                {{ form.subject || 'Subject' }}
+                                {{ sampleSubject }}
                             </div>
                             <iframe
                                 class="mt-3 h-[640px] w-full rounded border bg-white"
@@ -284,6 +400,12 @@ function submit() {
                             ></iframe>
                         </div>
                     </section>
+
+                    <VariablePicker
+                        :variables="props.variableDefinitions"
+                        :active-field-label="activeFieldLabel"
+                        @insert="insertVariable"
+                    />
 
                     <section class="rounded-lg border bg-card p-5">
                         <h2 class="font-semibold">Save checks</h2>

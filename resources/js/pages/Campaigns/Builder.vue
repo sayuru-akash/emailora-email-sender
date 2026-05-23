@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import {
     Check,
     ChevronRight,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
+import VariablePicker from '@/components/emailora/VariablePicker.vue';
 
 type TemplateOption = {
     id: number;
@@ -42,6 +43,15 @@ type AudienceEstimate = {
     suppressed_count: number;
 };
 
+type VariableDefinition = {
+    key: string;
+    token: string;
+    label: string;
+    group: string;
+    description: string;
+    sample?: string;
+};
+
 const props = defineProps<{
     campaign?: any;
     defaults?: any;
@@ -49,6 +59,7 @@ const props = defineProps<{
     lists?: AudienceOption[];
     tags?: AudienceOption[];
     selectedContacts?: ContactOption[];
+    variableDefinitions?: VariableDefinition[];
 }>();
 
 const defaultHtml =
@@ -71,6 +82,7 @@ const form = useForm({
     target_type: props.campaign?.target_type ?? 'all_contacts',
     target_filters: props.campaign?.target_filters ?? {},
     status: props.campaign?.status === 'scheduled' ? 'scheduled' : 'draft',
+    scheduled_at: props.campaign?.scheduled_at ?? '',
 });
 
 const steps = [
@@ -95,6 +107,19 @@ const contactSearchLoading = ref(false);
 const estimate = ref<AudienceEstimate | null>(null);
 const estimateLoading = ref(false);
 const builderTop = ref<HTMLElement | null>(null);
+const sendDialogOpen = ref(false);
+const sendAction = ref<'send' | 'schedule'>('send');
+const recipientMode = ref<'current_audience' | 'new_contacts'>(
+    'current_audience',
+);
+
+type InsertField = 'subject' | 'preheader' | 'html_body' | 'text_body';
+
+const activeInsertField = ref<InsertField>('html_body');
+const subjectField = ref<HTMLInputElement | null>(null);
+const preheaderField = ref<HTMLInputElement | null>(null);
+const htmlBodyField = ref<HTMLTextAreaElement | null>(null);
+const textBodyField = ref<HTMLTextAreaElement | null>(null);
 
 let contactSearchTimer: ReturnType<typeof setTimeout> | null = null;
 let estimateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -147,7 +172,10 @@ const canSave = computed(
     () => senderReady.value && contentReady.value && audienceReady.value,
 );
 const previewHtml = computed(() => {
-    const html = form.html_body || defaultHtml;
+    const html = withPreheader(
+        renderSampleContent(form.html_body || defaultHtml),
+        renderSampleContent(form.preheader || ''),
+    );
 
     if (/<base\s/i.test(html)) {
         return html;
@@ -160,7 +188,9 @@ const previewHtml = computed(() => {
     return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"></head><body>${html}</body></html>`;
 });
 const hasUnsubscribe = computed(() =>
-    `${form.html_body} ${form.text_body}`.toLowerCase().includes('unsubscribe'),
+    variablesIn(
+        `${form.preheader} ${form.html_body} ${form.text_body}`,
+    ).includes('unsubscribe_url'),
 );
 const audienceSummary = computed(() => {
     if (form.target_type === 'all_contacts') {
@@ -183,6 +213,105 @@ const saveLabel = computed(() =>
 const campaignError = computed(
     () => (form.errors as Record<string, string | undefined>).campaign,
 );
+const activeFieldLabel = computed(() => {
+    return {
+        subject: 'subject',
+        preheader: 'preheader',
+        html_body: 'HTML body',
+        text_body: 'plain text',
+    }[activeInsertField.value];
+});
+const sampleSubject = computed(() =>
+    renderSampleContent(form.subject || 'Subject'),
+);
+const samplePreheader = computed(() =>
+    renderSampleContent(form.preheader || 'No preheader set'),
+);
+
+function fieldElement(field: InsertField) {
+    return {
+        subject: subjectField.value,
+        preheader: preheaderField.value,
+        html_body: htmlBodyField.value,
+        text_body: textBodyField.value,
+    }[field];
+}
+
+function insertVariable(token: string) {
+    const field = activeInsertField.value;
+    const element = fieldElement(field);
+    const current = form[field] ?? '';
+    const start = element?.selectionStart ?? current.length;
+    const end = element?.selectionEnd ?? current.length;
+    const prefix = current.slice(0, start);
+    const suffix = current.slice(end);
+    const spacerBefore = prefix && !/\s$/.test(prefix) ? ' ' : '';
+    const spacerAfter = suffix && !/^\s/.test(suffix) ? ' ' : '';
+
+    form[field] = `${prefix}${spacerBefore}${token}${spacerAfter}${suffix}`;
+
+    requestAnimationFrame(() => {
+        const nextPosition = start + spacerBefore.length + token.length;
+        element?.focus();
+        element?.setSelectionRange(nextPosition, nextPosition);
+    });
+}
+
+function variablesIn(content: string) {
+    const keys = new Set<string>();
+    const regex = /\{\{\s*([a-zA-Z0-9_.-]+)\s*}}|\{\s*([a-zA-Z0-9_.-]+)\s*}/g;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+        const key = match[1] || match[2];
+
+        if (key) {
+            keys.add(key);
+        }
+    }
+
+    return [...keys];
+}
+
+function renderSampleContent(content: string) {
+    const values = new Map(
+        (props.variableDefinitions ?? []).map((definition) => [
+            definition.key,
+            definition.sample ?? '',
+        ]),
+    );
+
+    return content.replace(
+        /\{\{\s*([a-zA-Z0-9_.-]+)\s*}}|\{\s*([a-zA-Z0-9_.-]+)\s*}/g,
+        (_match, bladeKey: string | undefined, legacyKey: string | undefined) =>
+            values.get(bladeKey || legacyKey || '') ?? '',
+    );
+}
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function withPreheader(html: string, preheader: string) {
+    const cleanPreheader = preheader.trim();
+
+    if (!cleanPreheader) {
+        return html;
+    }
+
+    const node = `<div style="display:none!important;max-height:0;max-width:0;opacity:0;overflow:hidden;color:transparent;line-height:1px;mso-hide:all;">${escapeHtml(cleanPreheader)}</div>`;
+
+    if (/<body\b[^>]*>/i.test(html)) {
+        return html.replace(/(<body\b[^>]*>)/i, `$1${node}`);
+    }
+
+    return `${node}${html}`;
+}
 
 function stepClasses(step: StepKey) {
     const index = steps.findIndex((item) => item.key === step);
@@ -399,6 +528,37 @@ function save() {
     }
 
     form.post('/campaigns', options);
+}
+
+function openSendDialog(action: 'send' | 'schedule') {
+    sendAction.value = action;
+    sendDialogOpen.value = true;
+}
+
+function confirmSend() {
+    if (!props.campaign?.id) {
+        return;
+    }
+
+    syncAudienceFilters();
+
+    const scheduledAt =
+        sendAction.value === 'schedule' ? form.scheduled_at : null;
+
+    form.put(`/campaigns/${props.campaign.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            sendDialogOpen.value = false;
+            router.post(
+                `/campaigns/${props.campaign?.id}/send`,
+                {
+                    scheduled_at: scheduledAt,
+                    recipient_mode: recipientMode.value,
+                },
+                { preserveScroll: true },
+            );
+        },
+    });
 }
 
 watch(
@@ -673,9 +833,11 @@ refreshEstimate();
                             <label class="space-y-1.5">
                                 <span class="text-sm font-medium">Subject</span>
                                 <input
+                                    ref="subjectField"
                                     v-model="form.subject"
                                     class="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                     placeholder="Your payment reminder"
+                                    @focus="activeInsertField = 'subject'"
                                 />
                                 <span
                                     v-if="form.errors.subject"
@@ -688,9 +850,11 @@ refreshEstimate();
                                     >Preheader</span
                                 >
                                 <input
+                                    ref="preheaderField"
                                     v-model="form.preheader"
                                     class="h-10 w-full rounded-md border bg-background px-3 text-sm"
                                     placeholder="Short preview text shown in inboxes"
+                                    @focus="activeInsertField = 'preheader'"
                                 />
                             </label>
                             <label class="space-y-1.5">
@@ -698,9 +862,11 @@ refreshEstimate();
                                     >HTML body</span
                                 >
                                 <textarea
+                                    ref="htmlBodyField"
                                     v-model="form.html_body"
                                     class="min-h-[360px] w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
                                     spellcheck="false"
+                                    @focus="activeInsertField = 'html_body'"
                                 />
                                 <span
                                     v-if="form.errors.html_body"
@@ -713,9 +879,11 @@ refreshEstimate();
                                     >Plain text fallback</span
                                 >
                                 <textarea
+                                    ref="textBodyField"
                                     v-model="form.text_body"
                                     class="min-h-32 w-full rounded-md border bg-background px-3 py-2 text-sm"
                                     placeholder="Optional fallback for clients that do not render HTML"
+                                    @focus="activeInsertField = 'text_body'"
                                 />
                                 <span
                                     v-if="form.errors.text_body"
@@ -1072,9 +1240,10 @@ refreshEstimate();
                             v-if="!hasUnsubscribe"
                             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
                         >
-                            This message does not include the word
-                            “unsubscribe”. Sending will be blocked until the
-                            marketing unsubscribe requirement is satisfied.
+                            This message does not include
+                            <code v-pre>{{ unsubscribe_url }}</code
+                            >. Sending will be blocked until the unsubscribe URL
+                            token is present.
                         </div>
                         <div
                             v-if="campaignError"
@@ -1082,6 +1251,23 @@ refreshEstimate();
                         >
                             {{ campaignError }}
                         </div>
+                        <label
+                            v-if="props.campaign?.id"
+                            class="block space-y-1.5"
+                        >
+                            <span class="text-sm font-medium"
+                                >Schedule send</span
+                            >
+                            <input
+                                v-model="form.scheduled_at"
+                                class="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                type="datetime-local"
+                            />
+                            <span class="text-xs text-muted-foreground">
+                                Leave blank to send immediately from this
+                                campaign.
+                            </span>
+                        </label>
                     </div>
                 </section>
 
@@ -1146,6 +1332,12 @@ refreshEstimate();
                         </div>
                     </section>
 
+                    <VariablePicker
+                        :variables="props.variableDefinitions"
+                        :active-field-label="activeFieldLabel"
+                        @insert="insertVariable"
+                    />
+
                     <section class="rounded-lg border bg-card p-5">
                         <div
                             class="mb-3 flex items-start justify-between gap-3"
@@ -1155,13 +1347,13 @@ refreshEstimate();
                                 <p
                                     class="truncate text-sm text-muted-foreground"
                                 >
-                                    {{ form.preheader || 'No preheader set' }}
+                                    {{ samplePreheader }}
                                 </p>
                             </div>
                         </div>
                         <div class="rounded-md border bg-background p-3">
                             <div class="truncate text-sm font-medium">
-                                {{ form.subject || 'Subject' }}
+                                {{ sampleSubject }}
                             </div>
                             <iframe
                                 class="mt-3 h-[520px] w-full rounded border bg-white"
@@ -1209,7 +1401,135 @@ refreshEstimate();
                         <Check class="h-4 w-4" />
                         {{ form.processing ? 'Saving...' : saveLabel }}
                     </button>
+                    <button
+                        v-if="props.campaign?.id && activeStep === 'review'"
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="
+                            form.processing || !canSave || !form.scheduled_at
+                        "
+                        @click="openSendDialog('schedule')"
+                    >
+                        Schedule
+                    </button>
+                    <button
+                        v-if="props.campaign?.id && activeStep === 'review'"
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="form.processing || !canSave"
+                        @click="openSendDialog('send')"
+                    >
+                        Send now
+                    </button>
                 </div>
+            </div>
+
+            <div
+                v-if="sendDialogOpen"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+                role="dialog"
+                aria-modal="true"
+            >
+                <section
+                    class="w-full max-w-lg rounded-lg border bg-card p-5 shadow-xl"
+                >
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 class="text-lg font-semibold">
+                                {{
+                                    sendAction === 'schedule'
+                                        ? 'Schedule campaign'
+                                        : 'Send campaign'
+                                }}
+                            </h2>
+                            <p class="mt-1 text-sm text-muted-foreground">
+                                The latest edits will be saved first, then
+                                recipients will be prepared from your selected
+                                audience.
+                            </p>
+                        </div>
+                        <button
+                            class="rounded-md border px-2 py-1 text-sm"
+                            type="button"
+                            @click="sendDialogOpen = false"
+                        >
+                            Close
+                        </button>
+                    </div>
+
+                    <div class="mt-5 space-y-3">
+                        <label
+                            class="block cursor-pointer rounded-lg border p-4 transition hover:bg-muted/60"
+                            :class="
+                                recipientMode === 'current_audience'
+                                    ? 'border-primary bg-primary/5'
+                                    : ''
+                            "
+                        >
+                            <input
+                                v-model="recipientMode"
+                                class="sr-only"
+                                type="radio"
+                                value="current_audience"
+                            />
+                            <span class="font-medium"
+                                >Send to current audience</span
+                            >
+                            <span
+                                class="mt-1 block text-sm text-muted-foreground"
+                            >
+                                Rebuild recipients from the current filters and
+                                send to every matching emailable contact.
+                            </span>
+                        </label>
+                        <label
+                            class="block cursor-pointer rounded-lg border p-4 transition hover:bg-muted/60"
+                            :class="
+                                recipientMode === 'new_contacts'
+                                    ? 'border-primary bg-primary/5'
+                                    : ''
+                            "
+                        >
+                            <input
+                                v-model="recipientMode"
+                                class="sr-only"
+                                type="radio"
+                                value="new_contacts"
+                            />
+                            <span class="font-medium"
+                                >Only add new contacts</span
+                            >
+                            <span
+                                class="mt-1 block text-sm text-muted-foreground"
+                            >
+                                Keep already prepared recipients and add only
+                                contacts newly matching this audience.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="mt-5 flex justify-end gap-2">
+                        <button
+                            class="rounded-md border px-3 py-2 text-sm"
+                            type="button"
+                            @click="sendDialogOpen = false"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                            type="button"
+                            :disabled="form.processing"
+                            @click="confirmSend"
+                        >
+                            {{
+                                sendAction === 'schedule'
+                                    ? 'Save and schedule'
+                                    : 'Save and queue'
+                            }}
+                        </button>
+                    </div>
+                </section>
             </div>
         </form>
     </main>

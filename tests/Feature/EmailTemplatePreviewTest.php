@@ -63,4 +63,24 @@ class EmailTemplatePreviewTest extends TestCase
         $response->assertSee('<base target="_blank">', false);
         $response->assertSee('https://example.com/banner.png', false);
     }
+
+    public function test_template_preview_renders_sample_variables_and_preheader(): void
+    {
+        $user = User::factory()->create();
+        $template = EmailTemplate::query()->create([
+            'name' => 'Variable Template',
+            'subject' => 'Hi {{ name }}',
+            'preheader' => 'Preview for {{ name }}',
+            'html_body' => '<p>Hello {{ name }}</p><p><a href="{{ unsubscribe_url }}">Unsubscribe</a></p>',
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('templates.preview', $template));
+
+        $response->assertOk();
+        $response->assertSee('Hello Sample Contact', false);
+        $response->assertSee('Preview for Sample Contact', false);
+        $response->assertSee('https://example.com/unsubscribe/sample', false);
+        $response->assertDontSee('{{ name }}', false);
+    }
 }

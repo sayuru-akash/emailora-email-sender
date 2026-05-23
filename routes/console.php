@@ -9,4 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('emailora:campaigns:recover')->everyFiveMinutes();
+Schedule::command('emailora:campaigns:queue-scheduled')->everyMinute()->withoutOverlapping();
 Schedule::command('emailora:campaigns:finalize-stuck')->everyTenMinutes();

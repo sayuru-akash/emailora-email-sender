@@ -100,4 +100,44 @@ class CampaignBuilderTest extends TestCase
             ->assertSee('https://example.com/logo.png', false)
             ->assertHeader('Content-Type', 'text/html; charset=UTF-8');
     }
+
+    public function test_campaign_preview_renders_sample_variables_and_preheader(): void
+    {
+        $campaign = EmailCampaign::factory()->create([
+            'subject' => 'Hi {{ name }}',
+            'preheader' => 'Preview for {{ name }}',
+            'html_body' => '<p>Hello {{ name }}</p><p><a href="{{ unsubscribe_url }}">Unsubscribe</a></p>',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('campaigns.preview', $campaign))
+            ->assertOk()
+            ->assertSee('Hello Sample Contact', false)
+            ->assertSee('Preview for Sample Contact', false)
+            ->assertSee('https://example.com/unsubscribe/sample', false)
+            ->assertDontSee('{{ name }}', false);
+    }
+
+    public function test_draft_recipients_page_shows_target_audience_before_preparation(): void
+    {
+        $contact = Contact::query()->create([
+            'full_name' => 'Target Student',
+            'email' => 'target@example.com',
+            'status' => 'active',
+        ]);
+        $campaign = EmailCampaign::factory()->create([
+            'status' => 'draft',
+            'target_type' => 'manual_selection',
+            'target_filters' => ['contact_ids' => [$contact->id]],
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('campaigns.recipients', $campaign))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('mode', 'target_audience')
+                ->where('recipients.meta.total', 1)
+                ->where('recipients.data.0.email_normalized', 'target@example.com')
+                ->where('recipients.data.0.status', 'targeted'));
+    }
 }

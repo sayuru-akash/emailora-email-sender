@@ -24,6 +24,7 @@ class CampaignSendRequest extends FormRequest
     {
         return [
             'scheduled_at' => ['nullable', 'date'],
+            'recipient_mode' => ['nullable', 'in:current_audience,new_contacts'],
         ];
     }
 }

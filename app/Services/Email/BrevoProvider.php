@@ -16,16 +16,33 @@ final class BrevoProvider implements EmailProviderInterface
             return EmailResult::failed('Brevo API key is not configured.', 'configuration');
         }
 
-        $response = Http::timeout(config('emailora.timeout'))->withHeaders(['api-key' => $apiKey])->post('https://api.brevo.com/v3/smtp/email', [
+        $data = [
             'sender' => ['name' => $payload->fromName, 'email' => $payload->fromEmail],
             'to' => [['email' => $payload->to]],
-            'replyTo' => $payload->replyTo ? ['email' => $payload->replyTo] : null,
             'subject' => $payload->subject,
-            'htmlContent' => $payload->html,
-            'textContent' => $payload->text,
-            'headers' => $payload->headers,
-            'tags' => collect($payload->tags)->map(fn ($value, $name) => "{$name}:{$value}")->values()->all(),
-        ]);
+        ];
+
+        if ($payload->replyTo) {
+            $data['replyTo'] = ['email' => $payload->replyTo];
+        }
+
+        if ($payload->html) {
+            $data['htmlContent'] = $payload->html;
+        }
+
+        if ($payload->text) {
+            $data['textContent'] = $payload->text;
+        }
+
+        if ($payload->headers !== []) {
+            $data['headers'] = (object) $payload->headers;
+        }
+
+        if ($payload->tags !== []) {
+            $data['tags'] = collect($payload->tags)->map(fn ($value, $name) => "{$name}:{$value}")->values()->all();
+        }
+
+        $response = Http::timeout(config('emailora.timeout'))->withHeaders(['api-key' => $apiKey])->post('https://api.brevo.com/v3/smtp/email', $data);
 
         if (! $response->successful()) {
             return EmailResult::failed('Brevo rejected the email.', $response->status() === 429 ? 'rate_limited' : 'provider_rejected', $response->json() ?? []);
