@@ -19,7 +19,10 @@ class SavedSegmentController extends Controller
     {
         $segments = SavedSegment::latest()->paginate($this->perPage($request->input('per_page')))->withQueryString();
 
-        return Inertia::render('Segments/Index', ['segments' => $this->pagination($segments)]);
+        return Inertia::render('Segments/Index', [
+            'segments' => $this->pagination($segments),
+            'filters' => $request->only(['per_page']),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

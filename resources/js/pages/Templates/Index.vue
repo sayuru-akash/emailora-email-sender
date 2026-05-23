@@ -4,6 +4,7 @@ import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ templates?: any }>();
 </script>
 <template>
@@ -21,7 +22,7 @@ const props = defineProps<{ templates?: any }>();
                 ></template
             >
         </PageHeader>
-        <div class="overflow-hidden rounded-lg border bg-card">
+        <TableShell min-width="880px">
             <table
                 v-if="(props.templates?.data ?? []).length"
                 class="w-full text-sm"
@@ -47,7 +48,9 @@ const props = defineProps<{ templates?: any }>();
                 </tbody>
             </table>
             <EmptyState v-else title="No templates found" />
-            <Pagination :meta="props.templates?.meta" />
-        </div>
+            <template #footer>
+                <Pagination :meta="props.templates?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

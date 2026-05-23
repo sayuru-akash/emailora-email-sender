@@ -23,6 +23,8 @@ trait BuildsTableProps
 
     protected function perPage(int|string|null $value): int
     {
-        return min(100, max(10, (int) ($value ?: 25)));
+        $perPage = (int) ($value ?: 25);
+
+        return in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 25;
     }
 }

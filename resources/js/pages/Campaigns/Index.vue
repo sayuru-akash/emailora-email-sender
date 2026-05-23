@@ -4,6 +4,7 @@ import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ campaigns?: any }>();
 </script>
 <template>
@@ -21,10 +22,10 @@ const props = defineProps<{ campaigns?: any }>();
                 ></template
             >
         </PageHeader>
-        <div class="overflow-hidden rounded-lg border bg-card">
+        <TableShell min-width="900px">
             <table
                 v-if="(props.campaigns?.data ?? []).length"
-                class="w-full min-w-[900px] text-sm"
+                class="w-full text-sm"
             >
                 <tbody class="divide-y">
                     <tr
@@ -52,7 +53,9 @@ const props = defineProps<{ campaigns?: any }>();
                 </tbody>
             </table>
             <EmptyState v-else title="No campaign activity yet" />
-            <Pagination :meta="props.campaigns?.meta" />
-        </div>
+            <template #footer>
+                <Pagination :meta="props.campaigns?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

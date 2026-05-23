@@ -77,9 +77,18 @@ class ImportController extends Controller
         return redirect()->route('imports.show', $import)->with('success', 'Import queued.');
     }
 
-    public function show(ContactImport $import): Response|JsonResponse
+    public function show(Request $request, ContactImport $import): Response|JsonResponse
     {
-        $payload = ['import' => $import->loadCount('rows'), 'failedRows' => $import->rows()->where('status', 'failed')->limit(50)->get()];
+        $failedRows = $import->rows()
+            ->where('status', 'failed')
+            ->orderBy('row_number')
+            ->paginate($this->perPage($request->input('per_page')), ['*'], 'failed_page')
+            ->withQueryString();
+
+        $payload = [
+            'import' => $import->loadCount('rows'),
+            'failedRows' => $this->pagination($failedRows),
+        ];
 
         return request()->wantsJson() ? response()->json($payload) : Inertia::render('Imports/Show', $payload);
     }

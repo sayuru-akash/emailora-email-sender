@@ -4,6 +4,7 @@ import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ imports?: any }>();
 </script>
 <template>
@@ -18,20 +19,45 @@ const props = defineProps<{ imports?: any }>();
                 ></template
             ></PageHeader
         >
-        <div class="rounded-lg border bg-card">
-            <div v-if="(props.imports?.data ?? []).length">
-                <Link
-                    v-for="item in props.imports.data"
-                    :key="item.id"
-                    :href="`/imports/${item.id}`"
-                    class="flex justify-between border-b px-4 py-3 text-sm"
-                    ><span>{{ item.file_name }}</span
-                    ><StatusBadge :status="item.status"
-                /></Link>
-            </div>
-            <EmptyState v-else title="No imports found" /><Pagination
-                :meta="props.imports?.meta"
-            />
-        </div>
+        <TableShell min-width="900px">
+            <table
+                v-if="(props.imports?.data ?? []).length"
+                class="w-full text-sm"
+            >
+                <thead
+                    class="bg-muted text-left text-xs text-muted-foreground uppercase"
+                >
+                    <tr>
+                        <th class="px-4 py-3">File</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Processed</th>
+                        <th class="px-4 py-3">Created</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <tr v-for="item in props.imports.data" :key="item.id">
+                        <td class="px-4 py-3 font-medium">
+                            <Link :href="`/imports/${item.id}`">{{
+                                item.file_name
+                            }}</Link>
+                        </td>
+                        <td class="px-4 py-3">
+                            <StatusBadge :status="item.status" />
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            {{ item.processed_rows ?? 0 }} /
+                            {{ item.total_rows ?? 0 }}
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            {{ item.created_at ?? '-' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <EmptyState v-else title="No imports found" />
+            <template #footer>
+                <Pagination :meta="props.imports?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

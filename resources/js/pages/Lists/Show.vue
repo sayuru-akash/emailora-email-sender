@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
+import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 
 const props = defineProps<{ list: any; contacts?: any }>();
 </script>
@@ -14,8 +16,11 @@ const props = defineProps<{ list: any; contacts?: any }>();
             :title="props.list.name"
             :subtitle="props.list.description"
         />
-        <div class="overflow-hidden rounded-lg border bg-card">
-            <table class="w-full text-sm">
+        <TableShell min-width="820px">
+            <table
+                v-if="(props.contacts?.data ?? []).length"
+                class="w-full text-sm"
+            >
                 <tbody class="divide-y">
                     <tr
                         v-for="contact in props.contacts?.data ?? []"
@@ -31,7 +36,10 @@ const props = defineProps<{ list: any; contacts?: any }>();
                     </tr>
                 </tbody>
             </table>
-            <Pagination :meta="props.contacts?.meta" />
-        </div>
+            <EmptyState v-else title="No contacts found for this list" />
+            <template #footer>
+                <Pagination :meta="props.contacts?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

@@ -4,6 +4,7 @@ import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 
 const props = defineProps<{ lists?: any }>();
 const form = useForm({
@@ -44,7 +45,7 @@ const form = useForm({
                 Save
             </button>
         </form>
-        <div class="overflow-hidden rounded-lg border bg-card">
+        <TableShell min-width="760px">
             <table
                 v-if="(props.lists?.data ?? []).length"
                 class="w-full text-sm"
@@ -66,7 +67,9 @@ const form = useForm({
                 </tbody>
             </table>
             <EmptyState v-else title="No lists found" />
-            <Pagination :meta="props.lists?.meta" />
-        </div>
+            <template #footer>
+                <Pagination :meta="props.lists?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

@@ -5,6 +5,7 @@ import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 
 const props = defineProps<{
     contacts?: any;
@@ -16,7 +17,7 @@ const search = ref(props.filters?.search ?? '');
 watch(search, (value) => {
     router.get(
         '/contacts',
-        { ...props.filters, search: value || undefined },
+        { ...props.filters, search: value || undefined, page: undefined },
         { preserveState: true, replace: true },
     );
 });
@@ -63,6 +64,7 @@ watch(search, (value) => {
                         status:
                             ($event.target as HTMLSelectElement).value ||
                             undefined,
+                        page: undefined,
                     })
                 "
             >
@@ -77,10 +79,10 @@ watch(search, (value) => {
                 </option>
             </select>
         </div>
-        <div class="overflow-hidden rounded-lg border border-border bg-card">
+        <TableShell min-width="960px">
             <table
                 v-if="(props.contacts?.data ?? []).length"
-                class="w-full min-w-[900px] text-sm"
+                class="w-full text-sm"
             >
                 <thead
                     class="bg-muted text-left text-xs text-muted-foreground uppercase"
@@ -137,7 +139,9 @@ watch(search, (value) => {
                 title="No contacts found"
                 description="Change the filters to see more contacts."
             />
-            <Pagination :meta="props.contacts?.meta" />
-        </div>
+            <template #footer>
+                <Pagination :meta="props.contacts?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

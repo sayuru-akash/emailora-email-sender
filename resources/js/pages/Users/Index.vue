@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
+import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ users?: any }>();
 </script>
 <template>
@@ -17,24 +19,42 @@ const props = defineProps<{ users?: any }>();
                 ></template
             ></PageHeader
         >
-        <div class="rounded-lg border bg-card">
-            <div
-                v-for="user in props.users?.data ?? []"
-                :key="user.id"
-                class="flex justify-between border-b px-4 py-3 text-sm"
+        <TableShell min-width="820px">
+            <table
+                v-if="(props.users?.data ?? []).length"
+                class="w-full text-sm"
             >
-                <Link :href="`/users/${user.id}`" class="font-medium"
-                    >{{ user.name }}
-                    <span class="text-muted-foreground">{{
-                        user.email
-                    }}</span></Link
+                <thead
+                    class="bg-muted text-left text-xs text-muted-foreground uppercase"
                 >
-                <div class="flex gap-3">
-                    <span>{{ user.role }}</span
-                    ><StatusBadge :status="user.status" />
-                </div>
-            </div>
-            <Pagination :meta="props.users?.meta" />
-        </div>
+                    <tr>
+                        <th class="px-4 py-3">User</th>
+                        <th class="px-4 py-3">Email</th>
+                        <th class="px-4 py-3">Role</th>
+                        <th class="px-4 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <tr v-for="user in props.users?.data ?? []" :key="user.id">
+                        <td class="px-4 py-3 font-medium">
+                            <Link :href="`/users/${user.id}`">{{
+                                user.name
+                            }}</Link>
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground">
+                            {{ user.email }}
+                        </td>
+                        <td class="px-4 py-3">{{ user.role }}</td>
+                        <td class="px-4 py-3">
+                            <StatusBadge :status="user.status" />
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <EmptyState v-else title="No users found" />
+            <template #footer>
+                <Pagination :meta="props.users?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

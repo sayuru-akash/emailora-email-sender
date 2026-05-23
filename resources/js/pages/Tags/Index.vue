@@ -3,6 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
+import TableShell from '@/components/emailora/TableShell.vue';
 
 const props = defineProps<{ tags?: any }>();
 const form = useForm({ name: '', description: '', color: '#4f46e5' });
@@ -38,7 +39,7 @@ const form = useForm({ name: '', description: '', color: '#4f46e5' });
                 Save
             </button>
         </form>
-        <div class="overflow-hidden rounded-lg border bg-card">
+        <TableShell min-width="680px">
             <table
                 v-if="(props.tags?.data ?? []).length"
                 class="w-full text-sm"
@@ -57,7 +58,9 @@ const form = useForm({ name: '', description: '', color: '#4f46e5' });
                 </tbody>
             </table>
             <EmptyState v-else title="No tags found" />
-            <Pagination :meta="props.tags?.meta" />
-        </div>
+            <template #footer>
+                <Pagination :meta="props.tags?.meta" />
+            </template>
+        </TableShell>
     </main>
 </template>

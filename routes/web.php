@@ -45,6 +45,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::resource('imports', ImportController::class)->only(['index', 'show', 'destroy']);
 
     Route::post('/templates/{template}/duplicate', [EmailTemplateController::class, 'duplicate'])->name('templates.duplicate');
+    Route::get('/templates/{template}/preview', [EmailTemplateController::class, 'preview'])->name('templates.preview');
     Route::resource('templates', EmailTemplateController::class);
 
     Route::get('/campaigns/builder', [CampaignController::class, 'builder'])->name('campaigns.builder');
