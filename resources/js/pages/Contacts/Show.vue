@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 
 const props = defineProps<{ contact: any; recentMessages?: any[] }>();
+
+function deleteContact() {
+    if (confirm('Delete this contact?')) {
+        router.delete(`/contacts/${props.contact.id}`);
+    }
+}
 </script>
 
 <template>
@@ -42,16 +48,13 @@ const props = defineProps<{ contact: any; recentMessages?: any[] }>();
                     preserve-scroll
                     >Block</Link
                 >
-                <Link
+                <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                    :href="`/contacts/${props.contact.id}`"
-                    method="delete"
-                    as="button"
-                    @before="
-                        !window.confirm('Delete this contact?') &&
-                            $event.preventDefault()
-                    "
-                    >Delete</Link
+                    type="button"
+                    @click="deleteContact"
+                >
+                    Delete
+                </button>
                 >
             </template>
         </PageHeader>

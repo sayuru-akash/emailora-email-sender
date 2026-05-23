@@ -8,10 +8,11 @@ use App\Services\Email\CampaignCountRefresher;
 use App\Services\Email\EmailPersonalizer;
 use App\Services\Email\EmailPreviewDocument;
 use App\Services\Email\UnsubscribeLinkBuilder;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
-class PrepareEmailCampaignRecipients implements ShouldQueue
+class PrepareEmailCampaignRecipients implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
 
@@ -19,7 +20,14 @@ class PrepareEmailCampaignRecipients implements ShouldQueue
 
     public int $timeout = 120;
 
+    public int $uniqueFor = 300;
+
     public function __construct(public int $campaignId, public string $recipientMode = 'current_audience') {}
+
+    public function uniqueId(): string
+    {
+        return "{$this->campaignId}:{$this->recipientMode}";
+    }
 
     public function handle(AudienceResolver $resolver, EmailPersonalizer $personalizer, UnsubscribeLinkBuilder $unsubscribeLinks, EmailPreviewDocument $preview, CampaignCountRefresher $counts): void
     {

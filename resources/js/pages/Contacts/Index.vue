@@ -170,7 +170,10 @@ function togglePageSelection(event: Event) {
                 >
                     <tr>
                         <th class="w-10 px-4 py-3">
-                            <input type="checkbox" @change="togglePageSelection" />
+                            <input
+                                type="checkbox"
+                                @change="togglePageSelection"
+                            />
                         </th>
                         <th class="px-4 py-3">Name</th>
                         <th class="px-4 py-3">Email</th>

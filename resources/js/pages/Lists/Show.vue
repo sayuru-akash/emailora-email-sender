@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -7,15 +7,18 @@ import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 
 const props = defineProps<{ list: any; contacts?: any }>();
+
+function deleteList() {
+    if (confirm('Delete this list?')) {
+        router.delete(`/lists/${props.list.id}`);
+    }
+}
 </script>
 
 <template>
     <Head :title="props.list.name" />
     <main class="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
-        <PageHeader
-            :title="props.list.name"
-            :subtitle="props.list.description"
-        >
+        <PageHeader :title="props.list.name" :subtitle="props.list.description">
             <template #actions>
                 <Link class="rounded-md border px-3 py-2 text-sm" href="/lists"
                     >Back</Link
@@ -30,16 +33,13 @@ const props = defineProps<{ list: any; contacts?: any }>();
                     :href="`/lists/${props.list.id}/edit`"
                     >Edit</Link
                 >
-                <Link
+                <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                    :href="`/lists/${props.list.id}`"
-                    method="delete"
-                    as="button"
-                    @click="
-                        !window.confirm('Delete this list?') &&
-                            $event.preventDefault()
-                    "
-                    >Delete</Link
+                    type="button"
+                    @click="deleteList"
+                >
+                    Delete
+                </button>
                 >
             </template>
         </PageHeader>

@@ -6,7 +6,15 @@ export function initializeFlashToast(): void {
         const flash = (event as CustomEvent).detail?.flash;
 
         if (flash?.toast) {
-            toast[flash.toast.type](flash.toast.message);
+            if (flash.toast.type === 'error') {
+                toast.error(flash.toast.message);
+            } else if (flash.toast.type === 'warning') {
+                toast.warning(flash.toast.message);
+            } else if (flash.toast.type === 'info') {
+                toast.info(flash.toast.message);
+            } else {
+                toast.success(flash.toast.message);
+            }
         }
 
         if (flash?.success) {

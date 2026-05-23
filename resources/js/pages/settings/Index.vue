@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
-import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
+import InputError from '@/components/InputError.vue';
 const props = defineProps<{ settings?: any; providerStatus?: any }>();
 const form = useForm({
     company_name: props.settings?.company_name ?? 'Emailora',
@@ -36,7 +36,8 @@ function sendTestEmail() {
             testResult.value = 'Test request submitted.';
         },
         onError: () => {
-            testResult.value = 'Check the test email fields and provider configuration.';
+            testResult.value =
+                'Check the test email fields and provider configuration.';
         },
     });
 }
@@ -198,11 +199,9 @@ function sendTestEmail() {
                 >
                     {{ testForm.processing ? 'Sending...' : 'Send test' }}
                 </button>
-                <span
-                    v-if="testResult"
-                    class="text-sm text-muted-foreground"
-                    >{{ testResult }}</span
-                >
+                <span v-if="testResult" class="text-sm text-muted-foreground">{{
+                    testResult
+                }}</span>
             </div>
         </form>
     </main>

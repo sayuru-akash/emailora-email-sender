@@ -19,6 +19,23 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Use `TableShell` for horizontally scrollable tables.
 - Render validation errors beside fields with `InputError`.
 - Browser-facing invalid workflow states should redirect with a visible flash message instead of raw 422 exception pages.
+- Inertia component names are case-sensitive in production. Match controller names to actual paths exactly, for example `settings/Index` for `resources/js/pages/settings/Index.vue`.
+- Contact, list, and tag writes use Form Requests. Normalize contact email before validation and validate list/tag duplicate names by generated slug so DB unique constraints do not become 500s.
+
+## Data Model Notes
+
+- `contacts.email_normalized` is the canonical duplicate key.
+- Contact membership is stored in `contact_list` and `contact_tag`; never pass `list_ids` or `tag_ids` into `Contact::create()` / `update()`. Pull them out, then `sync()` relationships.
+- Lists use the `lists` table through `App\Models\ListModel`.
+- Imports currently parse CSV-style files. Do not claim XLSX support unless parser support is added and tested.
+
+## Personalization
+
+- Campaign/template variables support both `{{ variable }}` and legacy `{variable}`.
+- `{{ name }}` resolves from full name, first/last name, company, then email.
+- `metadata.<key>` values are supported when contact metadata contains that key.
+- `{{ unsubscribe_url }}` is required for real sends; save/send paths append a footer when missing.
+- Sending blocks unresolved variables so raw placeholders do not ship.
 
 ## Campaign Operations
 
@@ -28,6 +45,16 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Active/stuck campaigns are recovered by `emailora:campaigns:recover`.
 - Stale campaigns are finalized by `emailora:campaigns:finalize-stuck`.
 - Production must run `php artisan schedule:run` every minute and a monitored queue worker.
+- A queued/preparing campaign with no `campaign_recipients` yet should show its target audience count in the UI. The recover command should prepare recipients, not finalize it as empty.
+- `PrepareEmailCampaignRecipients` and `SendEmailCampaignMessages` are unique per campaign while pending/processing to avoid repeated recover runs piling up duplicate work.
+- After manual local queue fixes, verify `jobs=0`, `failed_jobs=0`, campaign counts, and recipient statuses before reporting success.
+
+## Providers
+
+- Effective provider env keys are `EMAIL_PROVIDER`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `EMAIL_REPLY_TO`, `RESEND_API_KEY`, and `BREVO_API_KEY`.
+- Do not echo provider secrets in chat or logs.
+- Brevo rejects empty optional fields such as an empty `headers` object; provider payloads should omit optional keys when empty.
+- `EmailPayload::$idempotencyKey` exists but is not yet wired to provider-specific idempotency headers. Treat retry/double-send risk seriously around provider sends.
 
 ## Verification
 

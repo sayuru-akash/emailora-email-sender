@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
+import InputError from '@/components/InputError.vue';
 
 const props = defineProps<{ contact?: any; lists?: any[]; tags?: any[] }>();
 const form = useForm({

@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ tag: any; contacts?: any }>();
+
+function deleteTag() {
+    if (confirm('Delete this tag?')) {
+        router.delete(`/tags/${props.tag.id}`);
+    }
+}
 </script>
 <template>
     <Head :title="props.tag.name" />
@@ -20,16 +26,13 @@ const props = defineProps<{ tag: any; contacts?: any }>();
                     :href="`/tags/${props.tag.id}/edit`"
                     >Edit</Link
                 >
-                <Link
+                <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                    :href="`/tags/${props.tag.id}`"
-                    method="delete"
-                    as="button"
-                    @click="
-                        !window.confirm('Delete this tag?') &&
-                            $event.preventDefault()
-                    "
-                    >Delete</Link
+                    type="button"
+                    @click="deleteTag"
+                >
+                    Delete
+                </button>
                 >
             </template>
         </PageHeader>

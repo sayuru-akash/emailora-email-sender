@@ -3,10 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\EmailCampaign;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
-class SendEmailCampaignMessages implements ShouldQueue
+class SendEmailCampaignMessages implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
 
@@ -14,7 +15,14 @@ class SendEmailCampaignMessages implements ShouldQueue
 
     public int $timeout = 120;
 
+    public int $uniqueFor = 300;
+
     public function __construct(public int $campaignId) {}
+
+    public function uniqueId(): string
+    {
+        return (string) $this->campaignId;
+    }
 
     public function handle(): void
     {
