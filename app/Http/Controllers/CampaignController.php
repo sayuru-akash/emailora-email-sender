@@ -16,9 +16,11 @@ use App\Models\Tag;
 use App\Services\Email\AudienceResolver;
 use App\Services\Email\CampaignCountRefresher;
 use App\Services\Email\EmailPersonalizer;
+use App\Services\Email\EmailPreviewDocument;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,6 +67,11 @@ class CampaignController extends Controller
             'campaign' => $campaign->loadCount('recipients'),
             'recipients' => $campaign->recipients()->latest()->limit(20)->get(),
         ]);
+    }
+
+    public function preview(EmailCampaign $campaign, EmailPreviewDocument $preview): HttpResponse
+    {
+        return $preview->response((string) $campaign->html_body);
     }
 
     public function edit(EmailCampaign $campaign): Response
@@ -210,8 +217,9 @@ class CampaignController extends Controller
         return [
             'campaign' => $campaign,
             'templates' => EmailTemplate::active()->orderBy('name')->get(['id', 'name', 'subject', 'preheader', 'html_body', 'text_body']),
-            'lists' => ListModel::active()->orderBy('name')->get(['id', 'name']),
-            'tags' => Tag::orderBy('name')->get(['id', 'name']),
+            'lists' => ListModel::active()->withCount('contacts')->orderBy('name')->get(['id', 'name']),
+            'tags' => Tag::withCount('contacts')->orderBy('name')->get(['id', 'name']),
+            'selectedContacts' => $this->selectedContacts($campaign),
             'defaults' => [
                 'from_name' => config('emailora.from_name'),
                 'from_email' => config('emailora.from_email'),
@@ -219,5 +227,28 @@ class CampaignController extends Controller
                 'provider' => config('emailora.provider'),
             ],
         ];
+    }
+
+    private function selectedContacts(?EmailCampaign $campaign): array
+    {
+        $filters = $campaign?->target_filters ?? [];
+        $contactIds = $filters['contact_ids'] ?? [];
+
+        if ($campaign === null || $campaign->target_type !== 'manual_selection' || $contactIds === []) {
+            return [];
+        }
+
+        return Contact::query()
+            ->whereIn('id', $contactIds)
+            ->orderBy('full_name')
+            ->get(['id', 'full_name', 'email', 'status', 'company'])
+            ->map(fn (Contact $contact) => [
+                'id' => $contact->id,
+                'name' => $contact->display_name,
+                'email' => $contact->email,
+                'status' => $contact->status,
+                'company' => $contact->company,
+            ])
+            ->all();
     }
 }

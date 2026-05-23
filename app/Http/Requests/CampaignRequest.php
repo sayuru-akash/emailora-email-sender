@@ -31,6 +31,7 @@ class CampaignRequest extends FormRequest
             'reply_to_email' => ['nullable', 'email', 'max:255'],
             'html_body' => ['required_without:text_body', 'nullable', 'string'],
             'text_body' => ['required_without:html_body', 'nullable', 'string'],
+            'email_template_id' => ['nullable', 'exists:email_templates,id'],
             'provider' => ['nullable', 'in:resend,brevo,auto'],
             'target_type' => ['required', 'in:all_contacts,list,tag,saved_segment,manual_selection,advanced_filter'],
             'target_filters' => ['nullable', 'array'],

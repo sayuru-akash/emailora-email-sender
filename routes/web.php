@@ -59,6 +59,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/campaigns/{campaign}/resume', [CampaignController::class, 'resume'])->name('campaigns.resume');
     Route::post('/campaigns/{campaign}/cancel', [CampaignController::class, 'cancel'])->name('campaigns.cancel');
     Route::post('/campaigns/{campaign}/duplicate', [CampaignController::class, 'duplicate'])->name('campaigns.duplicate');
+    Route::get('/campaigns/{campaign}/preview', [CampaignController::class, 'preview'])->name('campaigns.preview');
     Route::get('/campaigns/{campaign}/report', [CampaignController::class, 'report'])->name('campaigns.report');
     Route::get('/campaigns/{campaign}/recipients', [CampaignController::class, 'recipients'])->name('campaigns.recipients');
     Route::resource('campaigns', CampaignController::class);

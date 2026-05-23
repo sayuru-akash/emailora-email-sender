@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\BuildsTableProps;
 use App\Http\Requests\EmailTemplateRequest;
 use App\Models\EmailTemplate;
+use App\Services\Email\EmailPreviewDocument;
 use App\Services\Email\EmailSanitizer;
 use App\Services\Email\HtmlToText;
 use Illuminate\Http\RedirectResponse;
@@ -51,14 +52,9 @@ class EmailTemplateController extends Controller
         return Inertia::render('Templates/Show', ['template' => $template]);
     }
 
-    public function preview(EmailTemplate $template): HttpResponse
+    public function preview(EmailTemplate $template, EmailPreviewDocument $preview): HttpResponse
     {
-        return response($this->previewDocument((string) $template->html_body), 200, [
-            'Content-Security-Policy' => "default-src 'none'; img-src * data: blob:; style-src 'unsafe-inline' https: http:; font-src https: http: data:; media-src * data: blob:; object-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; frame-ancestors 'self'; base-uri 'self';",
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'Referrer-Policy' => 'no-referrer',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
+        return $preview->response((string) $template->html_body);
     }
 
     public function edit(EmailTemplate $template): Response
@@ -90,22 +86,5 @@ class EmailTemplateController extends Controller
         $template->delete();
 
         return redirect()->route('templates.index')->with('success', 'Template deleted.');
-    }
-
-    private function previewDocument(string $html): string
-    {
-        if (stripos($html, '<base ') !== false) {
-            return $html;
-        }
-
-        if (preg_match('/<head\b/i', $html) === 1) {
-            return preg_replace('/<head([^>]*)>/i', '<head$1><base target="_blank">', $html, 1) ?: $html;
-        }
-
-        if (preg_match('/<html\b/i', $html) === 1) {
-            return preg_replace('/<html([^>]*)>/i', '<html$1><head><meta charset="utf-8"><base target="_blank"></head>', $html, 1) ?: $html;
-        }
-
-        return '<!doctype html><html><head><meta charset="utf-8"><base target="_blank"></head><body>'.$html.'</body></html>';
     }
 }

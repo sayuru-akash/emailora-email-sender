@@ -4,6 +4,7 @@ import PageHeader from '@/components/emailora/PageHeader.vue';
 import StatCard from '@/components/emailora/StatCard.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 const props = defineProps<{ campaign: any; recipients?: any[] }>();
+const previewUrl = `/campaigns/${props.campaign.id}/preview`;
 </script>
 <template>
     <Head :title="props.campaign.name" />
@@ -44,6 +45,13 @@ const props = defineProps<{ campaign: any; recipients?: any[] }>();
                 </button>
                 <Link
                     class="rounded-md border px-3 py-2 text-sm"
+                    :href="previewUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Open Preview</Link
+                >
+                <Link
+                    class="rounded-md border px-3 py-2 text-sm"
                     :href="`/campaigns/${props.campaign.id}/report`"
                     >View Report</Link
                 >
@@ -72,9 +80,11 @@ const props = defineProps<{ campaign: any; recipients?: any[] }>();
             />
         </div>
         <section class="rounded-lg border bg-card p-5">
-            <StatusBadge :status="props.campaign.status" /><iframe
-                class="mt-4 h-96 w-full rounded border"
-                :srcdoc="props.campaign.html_body"
+            <StatusBadge :status="props.campaign.status" />
+            <iframe
+                class="mt-4 h-[70vh] min-h-[640px] w-full rounded border bg-white"
+                :src="previewUrl"
+                title="Campaign email preview"
             ></iframe>
         </section>
     </main>
