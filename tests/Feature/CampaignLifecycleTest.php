@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Jobs\PrepareEmailCampaignRecipients;
+use App\Jobs\SendEmailCampaignMessages;
 use App\Jobs\SendSingleEmail;
 use App\Models\CampaignRecipient;
 use App\Models\Contact;
 use App\Models\EmailCampaign;
+use App\Models\ListModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -30,12 +32,42 @@ class CampaignLifecycleTest extends TestCase
                 ->where('actions.canDelete', true));
     }
 
-    public function test_active_campaigns_cannot_be_edited_or_deleted(): void
+    public function test_active_campaign_edit_request_redirects_to_show_with_a_friendly_error(): void
     {
         $user = User::factory()->create();
         $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
 
-        $this->actingAs($user)->get(route('campaigns.edit', $campaign))->assertStatus(422);
+        $this->actingAs($user)
+            ->get(route('campaigns.edit', $campaign))
+            ->assertRedirect(route('campaigns.show', $campaign))
+            ->assertSessionHas('error', 'Only draft or scheduled campaigns can be edited. Duplicate this campaign to make changes.');
+    }
+
+    public function test_active_campaign_update_request_redirects_to_show_with_a_friendly_error(): void
+    {
+        $user = User::factory()->create();
+        $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
+
+        $this->actingAs($user)
+            ->put(route('campaigns.update', $campaign), [
+                'name' => $campaign->name,
+                'subject' => $campaign->subject,
+                'from_name' => $campaign->from_name,
+                'from_email' => $campaign->from_email,
+                'html_body' => $campaign->html_body,
+                'text_body' => $campaign->text_body,
+                'target_type' => $campaign->target_type,
+                'status' => 'draft',
+            ])
+            ->assertRedirect(route('campaigns.show', $campaign))
+            ->assertSessionHas('error', 'Only draft or scheduled campaigns can be edited. Duplicate this campaign to make changes.');
+    }
+
+    public function test_active_campaigns_cannot_be_deleted(): void
+    {
+        $user = User::factory()->create();
+        $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
+
         $this->actingAs($user)->delete(route('campaigns.destroy', $campaign))->assertStatus(422);
     }
 
@@ -98,6 +130,51 @@ class CampaignLifecycleTest extends TestCase
         $this->actingAs($user)->post(route('campaigns.cancel', $draft))->assertStatus(422);
         $this->actingAs($user)->post(route('campaigns.cancel', $queued))->assertRedirect();
         $this->assertSame('cancelled', $queued->refresh()->status);
+    }
+
+    public function test_queued_campaign_index_exposes_target_audience_count_before_recipients_are_prepared(): void
+    {
+        $list = ListModel::query()->create(['name' => 'Customers', 'slug' => 'customers']);
+        $contact = Contact::factory()->create();
+        $list->contacts()->attach($contact);
+        $campaign = EmailCampaign::factory()->create([
+            'status' => 'queued',
+            'target_type' => 'list',
+            'target_filters' => ['list_ids' => [$list->id]],
+            'total_recipients' => 0,
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('campaigns.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('campaigns.data.0.id', $campaign->id)
+                ->where('campaigns.data.0.display_recipient_count', 1)
+                ->where('campaigns.data.0.has_prepared_recipients', false));
+    }
+
+    public function test_queued_campaign_recipients_show_target_audience_before_recipients_are_prepared(): void
+    {
+        $list = ListModel::query()->create(['name' => 'Customers', 'slug' => 'customers']);
+        $contact = Contact::factory()->create([
+            'email' => 'customer@example.com',
+            'email_normalized' => 'customer@example.com',
+        ]);
+        $list->contacts()->attach($contact);
+        $campaign = EmailCampaign::factory()->create([
+            'status' => 'queued',
+            'target_type' => 'list',
+            'target_filters' => ['list_ids' => [$list->id]],
+            'total_recipients' => 0,
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('campaigns.recipients', $campaign))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('mode', 'target_audience')
+                ->where('recipients.data.0.email_normalized', 'customer@example.com')
+                ->where('recipients.data.0.status', 'targeted'));
     }
 
     public function test_paused_campaigns_cannot_be_deleted_directly(): void
@@ -195,5 +272,30 @@ class CampaignLifecycleTest extends TestCase
         $this->assertSame('queued', $due->refresh()->status);
         $this->assertSame('scheduled', $future->refresh()->status);
         Queue::assertPushed(PrepareEmailCampaignRecipients::class, fn (PrepareEmailCampaignRecipients $job): bool => $job->campaignId === $due->id);
+    }
+
+    public function test_recover_prepares_active_campaigns_without_prepared_recipients(): void
+    {
+        Queue::fake();
+        $campaign = EmailCampaign::factory()->create(['status' => 'queued']);
+
+        $this->artisan('emailora:campaigns:recover')->assertSuccessful();
+
+        Queue::assertPushed(PrepareEmailCampaignRecipients::class, fn (PrepareEmailCampaignRecipients $job): bool => $job->campaignId === $campaign->id);
+    }
+
+    public function test_recover_resumes_active_campaigns_with_pending_recipients(): void
+    {
+        Queue::fake();
+        $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
+        CampaignRecipient::query()->create([
+            'email_campaign_id' => $campaign->id,
+            'email_normalized' => 'pending@example.com',
+            'status' => 'pending',
+        ]);
+
+        $this->artisan('emailora:campaigns:recover')->assertSuccessful();
+
+        Queue::assertPushed(SendEmailCampaignMessages::class, fn (SendEmailCampaignMessages $job): bool => $job->campaignId === $campaign->id);
     }
 }

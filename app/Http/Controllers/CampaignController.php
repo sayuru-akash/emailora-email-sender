@@ -28,14 +28,16 @@ class CampaignController extends Controller
 {
     use BuildsTableProps;
 
-    public function index(Request $request): Response
+    public function index(Request $request, AudienceResolver $resolver): Response
     {
         $campaigns = EmailCampaign::query()
             ->search($request->string('search')->toString())
             ->byStatus($request->string('status')->toString() ?: null)
             ->when($request->filled('provider'), fn ($query) => $query->where('provider', $request->string('provider')))
+            ->withCount('recipients')
             ->latest()
             ->paginate($this->perPage($request->input('per_page')))
+            ->through(fn (EmailCampaign $campaign): array => $this->campaignIndexRow($campaign, $resolver))
             ->withQueryString();
 
         return Inertia::render('Campaigns/Index', ['campaigns' => $this->pagination($campaigns), 'filters' => $request->only(['search', 'status', 'provider', 'per_page'])]);
@@ -88,16 +90,21 @@ class CampaignController extends Controller
         );
     }
 
-    public function edit(EmailCampaign $campaign, EmailPersonalizer $personalizer): Response
+    public function edit(EmailCampaign $campaign, EmailPersonalizer $personalizer): Response|RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be edited.');
+        if (! $this->isCampaignEditable($campaign)) {
+            return redirect()->route('campaigns.show', $campaign)->with('error', $this->campaignNotEditableMessage());
+        }
 
         return Inertia::render('Campaigns/Builder', $this->builderProps($campaign, $personalizer));
     }
 
     public function update(CampaignRequest $request, EmailCampaign $campaign): RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be edited.');
+        if (! $this->isCampaignEditable($campaign)) {
+            return redirect()->route('campaigns.show', $campaign)->with('error', $this->campaignNotEditableMessage());
+        }
+
         $campaign->update($this->withUnsubscribeToken($request->validated()));
 
         return back()->with('success', 'Campaign updated.');
@@ -254,7 +261,7 @@ class CampaignController extends Controller
 
     public function recipients(Request $request, EmailCampaign $campaign, AudienceResolver $resolver): Response
     {
-        if (! $campaign->recipients()->exists() && in_array($campaign->status, ['draft', 'scheduled'], true)) {
+        if ($this->shouldShowTargetAudience($campaign)) {
             $contacts = $resolver->queryForCampaign($campaign)
                 ->orderBy('full_name')
                 ->paginate($this->perPage($request->input('per_page')))
@@ -318,7 +325,7 @@ class CampaignController extends Controller
     private function campaignActions(EmailCampaign $campaign): array
     {
         return [
-            'canEdit' => in_array($campaign->status, ['draft', 'scheduled'], true),
+            'canEdit' => $this->isCampaignEditable($campaign),
             'canSend' => in_array($campaign->status, ['draft', 'scheduled'], true),
             'canPause' => in_array($campaign->status, ['queued', 'preparing', 'sending'], true),
             'canResume' => $campaign->status === 'paused',
@@ -326,6 +333,41 @@ class CampaignController extends Controller
             'canDelete' => ! in_array($campaign->status, ['queued', 'preparing', 'sending', 'paused'], true),
             'canResendFailed' => in_array($campaign->status, ['completed', 'failed'], true) && $campaign->failed_count > 0,
         ];
+    }
+
+    private function campaignIndexRow(EmailCampaign $campaign, AudienceResolver $resolver): array
+    {
+        $preparedCount = (int) ($campaign->recipients_count ?? $campaign->recipients()->count());
+        $displayRecipientCount = $campaign->total_recipients;
+
+        if ($preparedCount === 0 && $this->canPreviewTargetAudience($campaign)) {
+            $displayRecipientCount = $resolver->queryForCampaign($campaign)->count();
+        }
+
+        return array_merge($campaign->toArray(), [
+            'has_prepared_recipients' => $preparedCount > 0,
+            'display_recipient_count' => $displayRecipientCount,
+        ]);
+    }
+
+    private function shouldShowTargetAudience(EmailCampaign $campaign): bool
+    {
+        return ! $campaign->recipients()->exists() && $this->canPreviewTargetAudience($campaign);
+    }
+
+    private function canPreviewTargetAudience(EmailCampaign $campaign): bool
+    {
+        return in_array($campaign->status, ['draft', 'scheduled', 'queued', 'preparing'], true);
+    }
+
+    private function isCampaignEditable(EmailCampaign $campaign): bool
+    {
+        return in_array($campaign->status, ['draft', 'scheduled'], true);
+    }
+
+    private function campaignNotEditableMessage(): string
+    {
+        return 'Only draft or scheduled campaigns can be edited. Duplicate this campaign to make changes.';
     }
 
     private function personalizableContent(EmailCampaign $campaign): string

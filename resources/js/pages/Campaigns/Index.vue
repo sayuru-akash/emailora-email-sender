@@ -111,7 +111,11 @@ function applyFilters(updates: Record<string, string>) {
                             <StatusBadge :status="campaign.status" />
                         </td>
                         <td class="px-4 py-3">
-                            {{ campaign.total_recipients }} recipients
+                            {{
+                                campaign.display_recipient_count ??
+                                campaign.total_recipients
+                            }}
+                            recipients
                         </td>
                         <td class="px-4 py-3">
                             {{ campaign.sent_count }} sent

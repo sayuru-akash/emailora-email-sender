@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -13,6 +13,8 @@ const props = defineProps<{
     filterOptions?: any;
 }>();
 const search = ref(props.filters?.search ?? '');
+const selectedIds = ref<number[]>([]);
+const hasSelection = computed(() => selectedIds.value.length > 0);
 
 watch(search, (value) => {
     router.get(
@@ -21,6 +23,37 @@ watch(search, (value) => {
         { preserveState: true, replace: true },
     );
 });
+
+function applyBulkAction(action: string) {
+    if (!hasSelection.value) {
+        return;
+    }
+
+    if (
+        action === 'delete' &&
+        !window.confirm(`Delete ${selectedIds.value.length} selected contacts?`)
+    ) {
+        return;
+    }
+
+    router.post(
+        '/contacts/bulk-action',
+        { action, ids: selectedIds.value },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                selectedIds.value = [];
+            },
+        },
+    );
+}
+
+function togglePageSelection(event: Event) {
+    const checked = (event.target as HTMLInputElement).checked;
+    selectedIds.value = checked
+        ? (props.contacts?.data ?? []).map((contact: any) => contact.id)
+        : [];
+}
 </script>
 
 <template>
@@ -78,6 +111,54 @@ watch(search, (value) => {
                     {{ status }}
                 </option>
             </select>
+            <select
+                class="h-9 rounded-md border border-border px-3 text-sm"
+                @change="
+                    router.get('/contacts', {
+                        ...props.filters,
+                        source:
+                            ($event.target as HTMLSelectElement).value ||
+                            undefined,
+                        page: undefined,
+                    })
+                "
+            >
+                <option value="">All sources</option>
+                <option
+                    v-for="source in props.filterOptions?.sources ?? []"
+                    :key="source"
+                    :value="source"
+                    :selected="props.filters?.source === source"
+                >
+                    {{ source }}
+                </option>
+            </select>
+            <div class="flex flex-wrap gap-2 md:ml-auto">
+                <button
+                    class="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
+                    :disabled="!hasSelection"
+                    type="button"
+                    @click="applyBulkAction('mark_inactive')"
+                >
+                    Mark inactive
+                </button>
+                <button
+                    class="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
+                    :disabled="!hasSelection"
+                    type="button"
+                    @click="applyBulkAction('unsubscribe')"
+                >
+                    Unsubscribe
+                </button>
+                <button
+                    class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive disabled:opacity-50"
+                    :disabled="!hasSelection"
+                    type="button"
+                    @click="applyBulkAction('delete')"
+                >
+                    Delete
+                </button>
+            </div>
         </div>
         <TableShell min-width="960px">
             <table
@@ -88,6 +169,9 @@ watch(search, (value) => {
                     class="bg-muted text-left text-xs text-muted-foreground uppercase"
                 >
                     <tr>
+                        <th class="w-10 px-4 py-3">
+                            <input type="checkbox" @change="togglePageSelection" />
+                        </th>
                         <th class="px-4 py-3">Name</th>
                         <th class="px-4 py-3">Email</th>
                         <th class="px-4 py-3">Status</th>
@@ -102,6 +186,13 @@ watch(search, (value) => {
                         v-for="contact in props.contacts.data"
                         :key="contact.id"
                     >
+                        <td class="px-4 py-3">
+                            <input
+                                v-model="selectedIds"
+                                type="checkbox"
+                                :value="contact.id"
+                            />
+                        </td>
                         <td class="max-w-56 truncate px-4 py-3 font-medium">
                             {{
                                 contact.full_name ||
@@ -125,11 +216,18 @@ watch(search, (value) => {
                             {{ contact.created_at }}
                         </td>
                         <td class="px-4 py-3">
-                            <Link
-                                class="text-primary"
-                                :href="`/contacts/${contact.id}`"
-                                >View</Link
-                            >
+                            <div class="flex gap-2">
+                                <Link
+                                    class="text-primary"
+                                    :href="`/contacts/${contact.id}`"
+                                    >View</Link
+                                >
+                                <Link
+                                    class="text-muted-foreground hover:text-primary"
+                                    :href="`/contacts/${contact.id}/edit`"
+                                    >Edit</Link
+                                >
+                            </div>
                         </td>
                     </tr>
                 </tbody>

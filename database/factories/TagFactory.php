@@ -17,8 +17,12 @@ class TagFactory extends Factory
      */
     public function definition(): array
     {
+        $name = fake()->unique()->word();
+
         return [
-            //
+            'name' => $name,
+            'description' => fake()->sentence(),
+            'color' => '#4f46e5',
         ];
     }
 }

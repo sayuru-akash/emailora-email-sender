@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -15,7 +15,34 @@ const props = defineProps<{ list: any; contacts?: any }>();
         <PageHeader
             :title="props.list.name"
             :subtitle="props.list.description"
-        />
+        >
+            <template #actions>
+                <Link class="rounded-md border px-3 py-2 text-sm" href="/lists"
+                    >Back</Link
+                >
+                <a
+                    class="rounded-md border px-3 py-2 text-sm"
+                    :href="`/lists/${props.list.id}/export`"
+                    >Export</a
+                >
+                <Link
+                    class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                    :href="`/lists/${props.list.id}/edit`"
+                    >Edit</Link
+                >
+                <Link
+                    class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
+                    :href="`/lists/${props.list.id}`"
+                    method="delete"
+                    as="button"
+                    @click="
+                        !window.confirm('Delete this list?') &&
+                            $event.preventDefault()
+                    "
+                    >Delete</Link
+                >
+            </template>
+        </PageHeader>
         <TableShell min-width="820px">
             <table
                 v-if="(props.contacts?.data ?? []).length"
@@ -27,7 +54,9 @@ const props = defineProps<{ list: any; contacts?: any }>();
                         :key="contact.id"
                     >
                         <td class="px-4 py-3 font-medium">
-                            {{ contact.full_name || contact.email }}
+                            <Link :href="`/contacts/${contact.id}`">{{
+                                contact.full_name || contact.email
+                            }}</Link>
                         </td>
                         <td class="px-4 py-3">{{ contact.email }}</td>
                         <td class="px-4 py-3">

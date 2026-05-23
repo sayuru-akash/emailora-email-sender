@@ -17,8 +17,13 @@ class ListModelFactory extends Factory
      */
     public function definition(): array
     {
+        $name = fake()->unique()->words(2, true);
+
         return [
-            //
+            'name' => $name,
+            'description' => fake()->sentence(),
+            'status' => 'active',
+            'color' => '#4f46e5',
         ];
     }
 }

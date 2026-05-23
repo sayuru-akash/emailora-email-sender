@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Contact;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class ContactRequest extends FormRequest
 {
@@ -28,7 +30,7 @@ class ContactRequest extends FormRequest
             'first_name' => ['nullable', 'string', 'max:120'],
             'last_name' => ['nullable', 'string', 'max:120'],
             'full_name' => ['nullable', 'string', 'max:240'],
-            'email' => ['required', 'email', 'max:255', 'unique:contacts,email_normalized,'.$contactId],
+            'email' => ['required', 'email', 'max:255', Rule::unique((new Contact)->getTable(), 'email_normalized')->ignore($contactId)],
             'phone' => ['nullable', 'string', 'max:80'],
             'company' => ['nullable', 'string', 'max:180'],
             'job_title' => ['nullable', 'string', 'max:180'],
@@ -44,5 +46,12 @@ class ContactRequest extends FormRequest
             'tag_ids' => ['array'],
             'tag_ids.*' => ['integer', 'exists:tags,id'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('email')) {
+            $this->merge(['email' => Contact::normalizeEmail($this->input('email'))]);
+        }
     }
 }

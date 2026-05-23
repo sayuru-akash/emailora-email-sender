@@ -7,7 +7,6 @@ use App\Http\Requests\TestEmailRequest;
 use App\Models\SystemSetting;
 use App\Services\Email\EmailPayload;
 use App\Services\Email\EmailService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,7 +15,7 @@ class SettingController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('Settings/Index', [
+        return Inertia::render('settings/Index', [
             'settings' => SystemSetting::pluck('value', 'key'),
             'providerStatus' => [
                 'resend' => ['configured' => (bool) config('emailora.resend.api_key')],
@@ -34,7 +33,7 @@ class SettingController extends Controller
         return back()->with('success', 'Settings updated.');
     }
 
-    public function testEmail(TestEmailRequest $request, EmailService $email): JsonResponse
+    public function testEmail(TestEmailRequest $request, EmailService $email): RedirectResponse
     {
         $result = $email->send(new EmailPayload(
             to: $request->string('to')->toString(),
@@ -46,6 +45,10 @@ class SettingController extends Controller
             replyTo: config('emailora.reply_to'),
         ), $request->string('provider')->toString() ?: null);
 
-        return response()->json(['ok' => $result->accepted, 'provider' => $request->input('provider', config('emailora.provider')), 'message' => $result->accepted ? 'Provider accepted the test email.' : $result->errorMessage]);
+        if (! $result->accepted) {
+            return back()->with('error', $result->errorMessage ?: 'Provider rejected the test email.');
+        }
+
+        return back()->with('success', 'Provider accepted the test email.');
     }
 }

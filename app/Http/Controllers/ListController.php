@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsTableProps;
+use App\Http\Requests\ListRequest;
 use App\Models\Contact;
 use App\Models\ListModel;
 use Illuminate\Http\RedirectResponse;
@@ -32,14 +33,19 @@ class ListController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function create(): Response
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'], 'status' => ['required', 'in:active,inactive,archived'], 'color' => ['nullable', 'string', 'max:24']]);
+        return Inertia::render('Lists/Form', ['list' => null]);
+    }
+
+    public function store(ListRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
         $data['slug'] = Str::slug($data['name']);
         $data['created_by'] = $request->user()->id;
-        ListModel::create($data);
+        $list = ListModel::create($data);
 
-        return back()->with('success', 'List saved.');
+        return redirect()->route('lists.show', $list)->with('success', 'List saved.');
     }
 
     public function show(Request $request, ListModel $list): Response
@@ -49,13 +55,18 @@ class ListController extends Controller
         return Inertia::render('Lists/Show', ['list' => $list, 'contacts' => $this->pagination($contacts), 'filters' => $request->only(['search', 'per_page'])]);
     }
 
-    public function update(Request $request, ListModel $list): RedirectResponse
+    public function edit(ListModel $list): Response
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'], 'status' => ['required', 'in:active,inactive,archived'], 'color' => ['nullable', 'string', 'max:24']]);
-        $data['slug'] = $list->slug ?: Str::slug($data['name']);
+        return Inertia::render('Lists/Form', ['list' => $list]);
+    }
+
+    public function update(ListRequest $request, ListModel $list): RedirectResponse
+    {
+        $data = $request->validated();
+        $data['slug'] = Str::slug($data['name']);
         $list->update($data);
 
-        return back()->with('success', 'List updated.');
+        return redirect()->route('lists.show', $list)->with('success', 'List updated.');
     }
 
     public function destroy(ListModel $list): RedirectResponse

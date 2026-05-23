@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 
-const props = defineProps<{ tags?: any }>();
-const form = useForm({ name: '', description: '', color: '#4f46e5' });
+const props = defineProps<{ tags?: any; filters?: any }>();
+const search = ref(props.filters?.search ?? '');
+
+watch(search, (value) => {
+    router.get(
+        '/tags',
+        { ...props.filters, search: value || undefined, page: undefined },
+        { preserveState: true, replace: true },
+    );
+});
 </script>
 
 <template>
@@ -15,36 +24,39 @@ const form = useForm({ name: '', description: '', color: '#4f46e5' });
         <PageHeader
             title="Tags"
             :subtitle="`${props.tags?.meta?.total ?? 0} tags`"
-        />
-        <form
-            class="mb-4 flex flex-col gap-2 rounded-lg border bg-card p-3 md:flex-row"
-            @submit.prevent="
-                form.post('/tags', {
-                    preserveScroll: true,
-                    onSuccess: () => form.reset(),
-                })
-            "
+        >
+            <template #actions>
+                <Link
+                    class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                    href="/tags/create"
+                    >Create Tag</Link
+                >
+            </template>
+        </PageHeader>
+        <div
+            class="mb-4 flex flex-col gap-2 rounded-lg border border-border bg-card p-3 md:flex-row"
         >
             <input
-                v-model="form.name"
-                class="h-9 rounded-md border px-3 text-sm md:w-72"
-                placeholder="Tag name"
+                v-model="search"
+                class="h-9 rounded-md border border-border px-3 text-sm md:w-80"
+                placeholder="Search tags"
             />
-            <input
-                v-model="form.description"
-                class="h-9 flex-1 rounded-md border px-3 text-sm"
-                placeholder="Description"
-            />
-            <button class="rounded-md bg-primary px-3 py-2 text-sm text-white">
-                Save
-            </button>
-        </form>
+        </div>
         <TableShell min-width="680px">
             <table
                 v-if="(props.tags?.data ?? []).length"
                 class="w-full text-sm"
             >
-                <tbody class="divide-y">
+                <thead
+                    class="bg-muted text-left text-xs text-muted-foreground uppercase"
+                >
+                    <tr>
+                        <th class="px-4 py-3">Name</th>
+                        <th class="px-4 py-3">Contacts</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
                     <tr v-for="tag in props.tags.data" :key="tag.id">
                         <td class="px-4 py-3 font-medium">
                             <Link :href="`/tags/${tag.id}`">{{
@@ -53,6 +65,20 @@ const form = useForm({ name: '', description: '', color: '#4f46e5' });
                         </td>
                         <td class="px-4 py-3 text-muted-foreground">
                             {{ tag.contacts_count ?? 0 }} contacts
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex justify-end gap-2">
+                                <Link
+                                    class="rounded-md border px-2.5 py-1.5 text-xs"
+                                    :href="`/tags/${tag.id}`"
+                                    >Open</Link
+                                >
+                                <Link
+                                    class="rounded-md border px-2.5 py-1.5 text-xs"
+                                    :href="`/tags/${tag.id}/edit`"
+                                    >Edit</Link
+                                >
+                            </div>
                         </td>
                     </tr>
                 </tbody>

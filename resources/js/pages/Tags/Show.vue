@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -10,7 +10,29 @@ const props = defineProps<{ tag: any; contacts?: any }>();
 <template>
     <Head :title="props.tag.name" />
     <main class="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
-        <PageHeader :title="props.tag.name" :subtitle="props.tag.description" />
+        <PageHeader :title="props.tag.name" :subtitle="props.tag.description">
+            <template #actions>
+                <Link class="rounded-md border px-3 py-2 text-sm" href="/tags"
+                    >Back</Link
+                >
+                <Link
+                    class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                    :href="`/tags/${props.tag.id}/edit`"
+                    >Edit</Link
+                >
+                <Link
+                    class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
+                    :href="`/tags/${props.tag.id}`"
+                    method="delete"
+                    as="button"
+                    @click="
+                        !window.confirm('Delete this tag?') &&
+                            $event.preventDefault()
+                    "
+                    >Delete</Link
+                >
+            </template>
+        </PageHeader>
         <TableShell min-width="820px">
             <table
                 v-if="(props.contacts?.data ?? []).length"
@@ -31,7 +53,9 @@ const props = defineProps<{ tag: any; contacts?: any }>();
                         :key="contact.id"
                     >
                         <td class="px-4 py-3 font-medium">
-                            {{ contact.full_name || contact.email }}
+                            <Link :href="`/contacts/${contact.id}`">{{
+                                contact.full_name || contact.email
+                            }}</Link>
                         </td>
                         <td class="px-4 py-3">{{ contact.email }}</td>
                         <td class="px-4 py-3">

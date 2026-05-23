@@ -54,10 +54,14 @@ class ContactController extends Controller
     public function store(ContactRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $listIds = $data['list_ids'] ?? [];
+        $tagIds = $data['tag_ids'] ?? [];
+        unset($data['list_ids'], $data['tag_ids']);
+
         $data['created_by'] = $request->user()->id;
         $contact = Contact::create($data);
-        $contact->lists()->sync($data['list_ids'] ?? []);
-        $contact->tags()->sync($data['tag_ids'] ?? []);
+        $contact->lists()->sync($listIds);
+        $contact->tags()->sync($tagIds);
 
         return redirect()->route('contacts.show', $contact)->with('success', 'Contact saved.');
     }
@@ -78,10 +82,14 @@ class ContactController extends Controller
     public function update(ContactRequest $request, Contact $contact): RedirectResponse
     {
         $data = $request->validated();
+        $listIds = $data['list_ids'] ?? [];
+        $tagIds = $data['tag_ids'] ?? [];
+        unset($data['list_ids'], $data['tag_ids']);
+
         $data['updated_by'] = $request->user()->id;
         $contact->update($data);
-        $contact->lists()->sync($data['list_ids'] ?? []);
-        $contact->tags()->sync($data['tag_ids'] ?? []);
+        $contact->lists()->sync($listIds);
+        $contact->tags()->sync($tagIds);
 
         return back()->with('success', 'Contact updated.');
     }

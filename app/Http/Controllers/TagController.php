@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsTableProps;
+use App\Http\Requests\TagRequest;
 use App\Models\Tag;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,14 +22,19 @@ class TagController extends Controller
         return Inertia::render('Tags/Index', ['tags' => $this->pagination($tags), 'filters' => $request->only(['search', 'per_page'])]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function create(): Response
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'], 'color' => ['nullable', 'string', 'max:24']]);
+        return Inertia::render('Tags/Form', ['tag' => null]);
+    }
+
+    public function store(TagRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
         $data['slug'] = Str::slug($data['name']);
         $data['created_by'] = $request->user()->id;
-        Tag::create($data);
+        $tag = Tag::create($data);
 
-        return back()->with('success', 'Tag saved.');
+        return redirect()->route('tags.show', $tag)->with('success', 'Tag saved.');
     }
 
     public function show(Request $request, Tag $tag): Response
@@ -38,13 +44,18 @@ class TagController extends Controller
         return Inertia::render('Tags/Show', ['tag' => $tag, 'contacts' => $this->pagination($contacts), 'filters' => $request->only(['search', 'per_page'])]);
     }
 
-    public function update(Request $request, Tag $tag): RedirectResponse
+    public function edit(Tag $tag): Response
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'], 'color' => ['nullable', 'string', 'max:24']]);
-        $data['slug'] = $tag->slug ?: Str::slug($data['name']);
+        return Inertia::render('Tags/Form', ['tag' => $tag]);
+    }
+
+    public function update(TagRequest $request, Tag $tag): RedirectResponse
+    {
+        $data = $request->validated();
+        $data['slug'] = Str::slug($data['name']);
         $tag->update($data);
 
-        return back()->with('success', 'Tag updated.');
+        return redirect()->route('tags.show', $tag)->with('success', 'Tag updated.');
     }
 
     public function destroy(Tag $tag): RedirectResponse
