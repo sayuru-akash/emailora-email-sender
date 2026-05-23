@@ -8,9 +8,13 @@ defineProps<{
 </script>
 
 <template>
-    <div class="rounded-lg border border-dashed border-border bg-white p-8 text-center">
+    <div
+        class="rounded-lg border border-dashed border-border bg-card p-8 text-center"
+    >
         <Inbox class="mx-auto size-8 text-muted-foreground" />
         <div class="mt-3 font-medium">{{ title }}</div>
-        <div v-if="description" class="mt-1 text-sm text-muted-foreground">{{ description }}</div>
+        <div v-if="description" class="mt-1 text-sm text-muted-foreground">
+            {{ description }}
+        </div>
     </div>
 </template>

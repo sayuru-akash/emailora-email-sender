@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue';
-
 defineOptions({
     inheritAttrs: false,
 });
-
-type Props = {
-    className?: HTMLAttributes['class'];
-};
-
-defineProps<Props>();
 </script>
 
 <template>
@@ -17,7 +9,6 @@ defineProps<Props>();
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 40 40"
         fill="none"
-        :class="className"
         v-bind="$attrs"
     >
         <path

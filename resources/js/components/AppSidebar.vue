@@ -7,7 +7,6 @@ import {
     LayoutDashboard,
     List,
     Send,
-    Settings,
     Tag,
     Upload,
     UserCog,
@@ -47,7 +46,6 @@ const bottomNavItems = computed<NavItem[]>(() => [
     ...(role.value === 'owner' || role.value === 'admin'
         ? [{ title: 'Users', href: '/users', icon: UserCog }]
         : []),
-    { title: 'Settings', href: '/settings', icon: Settings },
 ]);
 </script>
 

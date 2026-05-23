@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-    <div class="rounded-lg border border-border bg-white p-4 shadow-sm">
+    <div class="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div class="text-sm text-muted-foreground">{{ label }}</div>
         <div
             :class="[

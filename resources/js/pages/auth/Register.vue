@@ -12,7 +12,13 @@ defineOptions({
 <template>
     <Head title="Registration disabled" />
     <div class="space-y-4 text-center">
-        <p class="text-sm text-muted-foreground">Public registration is disabled for this workspace.</p>
-        <Link class="text-sm font-medium text-primary underline underline-offset-4" href="/login">Log in</Link>
+        <p class="text-sm text-muted-foreground">
+            Public registration is disabled for this workspace.
+        </p>
+        <Link
+            class="text-sm font-medium text-primary underline underline-offset-4"
+            href="/login"
+            >Log in</Link
+        >
     </div>
 </template>

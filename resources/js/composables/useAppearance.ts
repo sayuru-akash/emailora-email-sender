@@ -10,6 +10,8 @@ export type UseAppearanceReturn = {
     updateAppearance: (value: Appearance) => void;
 };
 
+const validAppearances: Appearance[] = ['light', 'dark'];
+
 const setCookie = (name: string, value: string, days = 365) => {
     if (typeof document === 'undefined') {
         return;
@@ -20,33 +22,74 @@ const setCookie = (name: string, value: string, days = 365) => {
     document.cookie = `${name}=${value};path=/;max-age=${maxAge};SameSite=Lax`;
 };
 
-export function updateTheme(): void {
+const getCookie = (name: string): string | null => {
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    return (
+        document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith(`${name}=`))
+            ?.split('=')
+            .slice(1)
+            .join('=') ?? null
+    );
+};
+
+const normalizeAppearance = (value: string | null | undefined): Appearance => {
+    return validAppearances.includes(value as Appearance)
+        ? (value as Appearance)
+        : 'light';
+};
+
+const getStoredAppearance = (): Appearance => {
+    if (typeof window === 'undefined') {
+        return 'light';
+    }
+
+    return normalizeAppearance(
+        localStorage.getItem('appearance') ?? getCookie('appearance'),
+    );
+};
+
+export function updateTheme(value: Appearance): void {
     if (typeof window === 'undefined') {
         return;
     }
 
-    document.documentElement.classList.remove('dark');
-    localStorage.setItem('appearance', 'light');
-    setCookie('appearance', 'light');
+    const nextAppearance = normalizeAppearance(value);
+
+    document.documentElement.classList.toggle(
+        'dark',
+        nextAppearance === 'dark',
+    );
+    localStorage.setItem('appearance', nextAppearance);
+    setCookie('appearance', nextAppearance);
 }
 
 export function initializeTheme(): void {
-    updateTheme();
+    const nextAppearance = getStoredAppearance();
+
+    appearance.value = nextAppearance;
+    updateTheme(nextAppearance);
 }
 
 const appearance = ref<Appearance>('light');
 
 export function useAppearance(): UseAppearanceReturn {
     onMounted(() => {
-        appearance.value = 'light';
-        updateTheme();
+        appearance.value = getStoredAppearance();
+        updateTheme(appearance.value);
     });
 
-    const resolvedAppearance = computed<ResolvedAppearance>(() => 'light');
+    const resolvedAppearance = computed<ResolvedAppearance>(() =>
+        appearance.value === 'dark' ? 'dark' : 'light',
+    );
 
-    function updateAppearance() {
-        appearance.value = 'light';
-        updateTheme();
+    function updateAppearance(value: Appearance) {
+        appearance.value = normalizeAppearance(value);
+        updateTheme(appearance.value);
     }
 
     return {

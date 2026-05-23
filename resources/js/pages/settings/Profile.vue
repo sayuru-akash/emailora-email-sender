@@ -24,19 +24,43 @@ const form = useForm({
 <template>
     <Head title="Profile settings" />
     <div class="flex flex-col space-y-6">
-        <Heading variant="small" title="Profile information" description="Update your name and email address" />
-        <form class="space-y-6" @submit.prevent="form.patch('/settings/profile')">
+        <Heading
+            variant="small"
+            title="Profile information"
+            description="Update your name and email address"
+        />
+        <form
+            class="space-y-6"
+            @submit.prevent="form.patch('/settings/profile')"
+        >
             <div class="grid gap-2">
                 <Label for="name">Name</Label>
-                <Input id="name" v-model="form.name" class="mt-1 block w-full" required autocomplete="name" />
+                <Input
+                    id="name"
+                    v-model="form.name"
+                    class="mt-1 block w-full"
+                    required
+                    autocomplete="name"
+                />
                 <InputError class="mt-2" :message="form.errors.name" />
             </div>
             <div class="grid gap-2">
                 <Label for="email">Email address</Label>
-                <Input id="email" v-model="form.email" type="email" class="mt-1 block w-full" required autocomplete="username" />
+                <Input
+                    id="email"
+                    v-model="form.email"
+                    type="email"
+                    class="mt-1 block w-full"
+                    required
+                    autocomplete="username"
+                />
                 <InputError class="mt-2" :message="form.errors.email" />
             </div>
-            <Button :disabled="form.processing" data-test="update-profile-button">Save</Button>
+            <Button
+                :disabled="form.processing"
+                data-test="update-profile-button"
+                >Save</Button
+            >
         </form>
     </div>
 </template>

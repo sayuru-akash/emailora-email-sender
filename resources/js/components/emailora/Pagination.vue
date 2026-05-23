@@ -13,8 +13,14 @@ const props = defineProps<{
 </script>
 
 <template>
-    <div v-if="(props.meta?.last_page ?? 1) > 1" class="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
-        <span class="text-muted-foreground">{{ meta?.from ?? 0 }}-{{ meta?.to ?? 0 }} of {{ meta?.total ?? 0 }}</span>
+    <div
+        v-if="(props.meta?.last_page ?? 1) > 1"
+        class="flex items-center justify-between border-t border-border px-4 py-3 text-sm"
+    >
+        <span class="text-muted-foreground"
+            >{{ meta?.from ?? 0 }}-{{ meta?.to ?? 0 }} of
+            {{ meta?.total ?? 0 }}</span
+        >
         <div class="flex gap-2">
             <Link
                 :href="`?page=${Math.max(1, (meta?.current_page ?? 1) - 1)}`"
