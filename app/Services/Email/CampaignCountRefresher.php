@@ -16,7 +16,7 @@ final class CampaignCountRefresher
         $campaign->forceFill([
             'total_recipients' => $counts->sum(),
             'pending_count' => (int) ($counts['pending'] ?? 0),
-            'queued_count' => (int) ($counts['queued'] ?? 0),
+            'queued_count' => (int) (($counts['queued'] ?? 0) + ($counts['sending'] ?? 0)),
             'sent_count' => (int) ($counts['sent'] ?? 0),
             'delivered_count' => (int) ($counts['delivered'] ?? 0),
             'opened_count' => (int) ($counts['opened'] ?? 0),

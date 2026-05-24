@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import CampaignProgress from '@/components/emailora/CampaignProgress.vue';
 import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import StatCard from '@/components/emailora/StatCard.vue';
@@ -33,6 +34,40 @@ const testForm = useForm({
     provider: props.campaign.provider ?? 'auto',
 });
 const testFormErrors = testForm.errors as Record<string, string | undefined>;
+const activeStatuses = ['queued', 'preparing', 'sending', 'paused'];
+const isLiveCampaign = computed(() =>
+    activeStatuses.includes(props.campaign.status),
+);
+const lastUpdated = ref('now');
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+function refreshCampaignStatus() {
+    if (!isLiveCampaign.value || processingAction.value) {
+        return;
+    }
+
+    router.reload({
+        only: ['campaign', 'audience', 'actions', 'recipients'],
+        onSuccess: () => {
+            lastUpdated.value = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        },
+    });
+}
+
+onMounted(() => {
+    refreshCampaignStatus();
+    refreshTimer = setInterval(refreshCampaignStatus, 2000);
+});
+
+onBeforeUnmount(() => {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+});
 
 function postAction(
     action: string,
@@ -42,6 +77,9 @@ function postAction(
     processingAction.value = action;
     router.post(path, data, {
         preserveScroll: true,
+        onSuccess: () => {
+            lastUpdated.value = 'now';
+        },
         onFinish: () => {
             processingAction.value = null;
         },
@@ -71,6 +109,9 @@ function confirmAction() {
     processingAction.value = confirmState.value.action;
     const options = {
         preserveScroll: true,
+        onSuccess: () => {
+            lastUpdated.value = 'now';
+        },
         onFinish: () => {
             processingAction.value = null;
             confirmDialogOpen.value = false;
@@ -99,6 +140,7 @@ function sendTestEmail() {
         onSuccess: () => {
             testDialogOpen.value = false;
             testForm.reset('to');
+            lastUpdated.value = 'now';
         },
     });
 }
@@ -276,6 +318,13 @@ function sendTestEmail() {
                 tone="danger"
             />
         </div>
+        <CampaignProgress
+            class="mb-6"
+            :campaign="props.campaign"
+            :audience="props.audience"
+            :last-updated="lastUpdated"
+            :live="isLiveCampaign"
+        />
         <section class="rounded-lg border bg-card p-5">
             <StatusBadge :status="props.campaign.status" />
             <iframe

@@ -18,7 +18,7 @@ return [
         'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),
     ],
     'brevo' => [
-        'api_key' => env('BREVO_API_KEY'),
+        'api_key' => env('BREVO_API_KEY') ?: env('BREVO_SMTP_API_KEY'),
         'webhook_secret' => env('BREVO_WEBHOOK_SECRET'),
     ],
 ];

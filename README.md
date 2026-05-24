@@ -61,10 +61,12 @@ EMAIL_TRACK_CLICKS=true
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=
 BREVO_API_KEY=
+# Legacy local alias accepted for compatibility; prefer BREVO_API_KEY.
+BREVO_SMTP_API_KEY=
 BREVO_WEBHOOK_SECRET=
 ```
 
-Provider keys are read from environment variables only. The UI reports missing provider configuration as a failure; it does not fake successful sends.
+Provider keys are read from environment variables only. `BREVO_API_KEY` is canonical; `BREVO_SMTP_API_KEY` is accepted as a backwards-compatible alias for older local `.env` files. The UI reports missing provider configuration as a failure; it does not fake successful sends.
 
 For production set `APP_ENV=production`, `APP_DEBUG=false`, a real `APP_URL`, secure session/cookie settings for your domain, and a production database. Keep `.env` out of git; `.env.example` is the only env file that should be committed.
 

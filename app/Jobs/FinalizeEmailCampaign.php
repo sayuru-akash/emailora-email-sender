@@ -21,11 +21,15 @@ class FinalizeEmailCampaign implements ShouldQueue
         }
 
         $campaign = $refresher->refresh($campaign);
-        $unfinished = $campaign->recipients()->whereIn('status', ['pending', 'queued'])->exists();
+        $unfinished = $campaign->recipients()->whereIn('status', ['pending', 'queued', 'sending'])->exists();
 
-        if (! $unfinished) {
-            $successful = $campaign->recipients()->whereIn('status', ['sent', 'delivered', 'opened', 'clicked'])->exists();
-            $campaign->update(['status' => $successful ? 'completed' : 'failed', 'completed_at' => now()]);
+        if ($unfinished) {
+            self::dispatch($campaign->id)->delay(now()->addSeconds(10))->onQueue('email');
+
+            return;
         }
+
+        $successful = $campaign->recipients()->whereIn('status', ['sent', 'delivered', 'opened', 'clicked'])->exists();
+        $campaign->update(['status' => $successful ? 'completed' : 'failed', 'completed_at' => now()]);
     }
 }

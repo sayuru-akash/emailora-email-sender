@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import CampaignProgress from '@/components/emailora/CampaignProgress.vue';
 import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
@@ -15,10 +16,17 @@ const props = defineProps<{
 }>();
 const processingAction = ref<string | null>(null);
 const resendAllDialogOpen = ref(false);
+const activeStatuses = ['queued', 'preparing', 'sending'];
+const isLiveCampaign = computed(() =>
+    activeStatuses.includes(props.campaign.status),
+);
+const lastUpdated = ref('now');
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
 const statuses = [
     { label: 'All', value: '' },
     { label: 'Pending', value: 'pending' },
     { label: 'Queued', value: 'queued' },
+    { label: 'Sending', value: 'sending' },
     { label: 'Sent', value: 'sent' },
     { label: 'Delivered', value: 'delivered' },
     { label: 'Opened', value: 'opened' },
@@ -48,6 +56,9 @@ function resendFailed() {
         {},
         {
             preserveScroll: true,
+            onSuccess: () => {
+                lastUpdated.value = 'now';
+            },
             onFinish: () => {
                 processingAction.value = null;
                 resendAllDialogOpen.value = false;
@@ -63,17 +74,54 @@ function retryRecipient(id: number) {
         {},
         {
             preserveScroll: true,
+            onSuccess: () => {
+                lastUpdated.value = 'now';
+            },
             onFinish: () => {
                 processingAction.value = null;
             },
         },
     );
 }
+
+function refreshRecipients() {
+    if (!isLiveCampaign.value || processingAction.value) {
+        return;
+    }
+
+    router.reload({
+        only: ['campaign', 'recipients', 'mode'],
+        onSuccess: () => {
+            lastUpdated.value = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        },
+    });
+}
+
+onMounted(() => {
+    refreshRecipients();
+    refreshTimer = setInterval(refreshRecipients, 2000);
+});
+
+onBeforeUnmount(() => {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+});
 </script>
 <template>
     <Head title="Recipients" />
     <main class="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
         <PageHeader :title="`${props.campaign.name} Recipients`" />
+        <CampaignProgress
+            class="mb-4"
+            :campaign="props.campaign"
+            :last-updated="lastUpdated"
+            :live="isLiveCampaign"
+        />
         <div
             v-if="props.mode === 'target_audience'"
             class="mb-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm"

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import CampaignProgress from '@/components/emailora/CampaignProgress.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -7,6 +9,14 @@ import RowAction from '@/components/emailora/RowAction.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ campaigns?: any; filters?: any }>();
+const activeStatuses = ['queued', 'preparing', 'sending'];
+const lastUpdated = ref('now');
+const hasActiveCampaigns = computed(() =>
+    (props.campaigns?.data ?? []).some((campaign: any) =>
+        activeStatuses.includes(campaign.status),
+    ),
+);
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
 const statuses = [
     '',
     'draft',
@@ -32,6 +42,34 @@ function applyFilters(updates: Record<string, string>) {
         { preserveScroll: true, preserveState: true, replace: true },
     );
 }
+
+function refreshCampaigns() {
+    if (!hasActiveCampaigns.value) {
+        return;
+    }
+
+    router.reload({
+        only: ['campaigns'],
+        onSuccess: () => {
+            lastUpdated.value = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        },
+    });
+}
+
+onMounted(() => {
+    refreshCampaigns();
+    refreshTimer = setInterval(refreshCampaigns, 2000);
+});
+
+onBeforeUnmount(() => {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+});
 </script>
 <template>
     <Head title="Campaigns" />
@@ -93,6 +131,14 @@ function applyFilters(updates: Record<string, string>) {
                 <option value="brevo">brevo</option>
             </select>
         </section>
+        <div
+            v-if="hasActiveCampaigns"
+            class="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+        >
+            <span class="size-1.5 animate-pulse rounded-full bg-primary"></span>
+            <span>Live campaign updates refresh every 2 seconds.</span>
+            <span v-if="lastUpdated">Checked {{ lastUpdated }}</span>
+        </div>
         <TableShell min-width="900px">
             <table
                 v-if="(props.campaigns?.data ?? []).length"
@@ -104,9 +150,7 @@ function applyFilters(updates: Record<string, string>) {
                     <tr>
                         <th class="px-4 py-3">Campaign</th>
                         <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">Recipients</th>
-                        <th class="px-4 py-3">Sent</th>
-                        <th class="px-4 py-3">Failed</th>
+                        <th class="px-4 py-3">Progress</th>
                         <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
@@ -124,17 +168,16 @@ function applyFilters(updates: Record<string, string>) {
                             <StatusBadge :status="campaign.status" />
                         </td>
                         <td class="px-4 py-3">
-                            {{
-                                campaign.display_recipient_count ??
-                                campaign.total_recipients
-                            }}
-                            recipients
-                        </td>
-                        <td class="px-4 py-3">
-                            {{ campaign.sent_count }} sent
-                        </td>
-                        <td class="px-4 py-3">
-                            {{ campaign.failed_count }} failed
+                            <CampaignProgress
+                                :campaign="campaign"
+                                compact
+                                :live="activeStatuses.includes(campaign.status)"
+                                :last-updated="
+                                    activeStatuses.includes(campaign.status)
+                                        ? lastUpdated
+                                        : ''
+                                "
+                            />
                         </td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex justify-end gap-2">

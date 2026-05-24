@@ -28,7 +28,15 @@ class RecoverCampaigns extends Command
 
                 if (! $campaign->recipients()->exists()) {
                     PrepareEmailCampaignRecipients::dispatch($campaign->id, $campaign->recipient_mode ?: 'current_audience')->onQueue('email');
-                } elseif ($campaign->recipients()->whereIn('status', ['pending', 'queued'])->exists()) {
+                } elseif ($campaign->recipients()
+                    ->where(function ($query): void {
+                        $query
+                            ->whereIn('status', ['pending', 'queued'])
+                            ->orWhere(function ($query): void {
+                                $query->where('status', 'sending')->where('last_attempt_at', '<', now()->subMinutes(5));
+                            });
+                    })
+                    ->exists()) {
                     SendEmailCampaignMessages::dispatch($campaign->id)->onQueue('email');
                 } else {
                     FinalizeEmailCampaign::dispatch($campaign->id)->onQueue('email');

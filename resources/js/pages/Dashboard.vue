@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import CampaignProgress from '@/components/emailora/CampaignProgress.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import StatCard from '@/components/emailora/StatCard.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
@@ -10,6 +12,47 @@ const props = defineProps<{
     recentImports?: any[];
     contactsByStatus?: any[];
 }>();
+const activeCampaignStatuses = ['queued', 'preparing', 'sending'];
+const activeImportStatuses = ['uploaded', 'mapped', 'processing'];
+const hasLiveWork = computed(
+    () =>
+        (props.recentCampaigns ?? []).some((campaign) =>
+            activeCampaignStatuses.includes(campaign.status),
+        ) ||
+        (props.recentImports ?? []).some((item) =>
+            activeImportStatuses.includes(item.status),
+        ),
+);
+const lastUpdated = ref('now');
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+function refreshDashboard() {
+    if (!hasLiveWork.value) {
+        return;
+    }
+
+    router.reload({
+        only: ['stats', 'recentCampaigns', 'recentImports'],
+        onSuccess: () => {
+            lastUpdated.value = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        },
+    });
+}
+
+onMounted(() => {
+    refreshDashboard();
+    refreshTimer = setInterval(refreshDashboard, 2000);
+});
+
+onBeforeUnmount(() => {
+    if (refreshTimer) {
+        clearInterval(refreshTimer);
+    }
+});
 </script>
 
 <template>
@@ -55,6 +98,14 @@ const props = defineProps<{
                 :value="props.stats?.scheduled_campaigns ?? 0"
             />
         </div>
+        <div
+            v-if="hasLiveWork"
+            class="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+        >
+            <span class="size-1.5 animate-pulse rounded-full bg-primary"></span>
+            <span>Live campaign/import updates refresh every 2 seconds.</span>
+            <span v-if="lastUpdated">Checked {{ lastUpdated }}</span>
+        </div>
 
         <div class="mt-6 grid gap-6 lg:grid-cols-3">
             <section
@@ -68,18 +119,35 @@ const props = defineProps<{
                         v-for="campaign in props.recentCampaigns ?? []"
                         :key="campaign.id"
                         :href="`/campaigns/${campaign.id}`"
-                        class="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted"
+                        class="grid min-h-24 grid-cols-[minmax(0,1fr)_104px] gap-x-4 gap-y-3 px-4 py-3 text-sm transition hover:bg-muted/50"
                     >
-                        <span class="min-w-0">
-                            <span class="block truncate font-medium">{{
-                                campaign.name
-                            }}</span>
-                            <span class="text-muted-foreground"
-                                >{{ campaign.sent_count }} sent /
-                                {{ campaign.failed_count }} failed</span
+                        <div class="min-w-0 self-start">
+                            <span
+                                class="block truncate leading-5 font-medium"
+                                >{{ campaign.name }}</span
                             >
-                        </span>
-                        <StatusBadge :status="campaign.status" />
+                            <span
+                                class="mt-0.5 block h-4 truncate text-xs leading-4 text-muted-foreground"
+                            >
+                                {{ campaign.subject || 'No subject' }}
+                            </span>
+                        </div>
+                        <div class="flex justify-end self-start">
+                            <StatusBadge :status="campaign.status" />
+                        </div>
+                        <CampaignProgress
+                            class="col-span-2"
+                            :campaign="campaign"
+                            compact
+                            :live="
+                                activeCampaignStatuses.includes(campaign.status)
+                            "
+                            :last-updated="
+                                activeCampaignStatuses.includes(campaign.status)
+                                    ? lastUpdated
+                                    : ''
+                            "
+                        />
                     </Link>
                     <div
                         v-if="!(props.recentCampaigns ?? []).length"
@@ -122,12 +190,16 @@ const props = defineProps<{
                     v-for="item in props.recentImports ?? []"
                     :key="item.id"
                     :href="`/imports/${item.id}`"
-                    class="flex items-center justify-between px-4 py-3 text-sm hover:bg-muted"
+                    class="flex items-center justify-between gap-4 px-4 py-3 text-sm hover:bg-muted"
                 >
-                    <span class="truncate">{{ item.file_name }}</span>
-                    <span class="text-muted-foreground"
-                        >{{ item.processed_rows }} / {{ item.total_rows }}</span
-                    >
+                    <span class="min-w-0">
+                        <span class="block truncate">{{ item.file_name }}</span>
+                        <span class="text-xs text-muted-foreground">
+                            {{ item.processed_rows }} / {{ item.total_rows }}
+                            rows
+                        </span>
+                    </span>
+                    <StatusBadge :status="item.status" />
                 </Link>
                 <div
                     v-if="!(props.recentImports ?? []).length"

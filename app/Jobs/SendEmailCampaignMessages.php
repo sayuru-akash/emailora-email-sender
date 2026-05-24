@@ -33,12 +33,22 @@ class SendEmailCampaignMessages implements ShouldBeUniqueUntilProcessing, Should
 
         $campaign->update(['status' => 'sending', 'started_at' => $campaign->started_at ?: now()]);
 
-        $campaign->recipients()->whereIn('status', ['pending', 'queued'])->chunkById(config('emailora.chunk_size'), function ($recipients): void {
-            foreach ($recipients as $recipient) {
-                $recipient->update(['status' => 'queued', 'queued_at' => now()]);
-                SendSingleEmail::dispatch($recipient->id)->onQueue('email');
-            }
-        });
+        $staleSendingBefore = now()->subMinutes(5);
+
+        $campaign->recipients()
+            ->where(function ($query) use ($staleSendingBefore): void {
+                $query
+                    ->whereIn('status', ['pending', 'queued'])
+                    ->orWhere(function ($query) use ($staleSendingBefore): void {
+                        $query->where('status', 'sending')->where('last_attempt_at', '<', $staleSendingBefore);
+                    });
+            })
+            ->chunkById(config('emailora.chunk_size'), function ($recipients): void {
+                foreach ($recipients as $recipient) {
+                    $recipient->update(['status' => 'queued', 'queued_at' => now()]);
+                    SendSingleEmail::dispatch($recipient->id)->onQueue('email');
+                }
+            });
 
         FinalizeEmailCampaign::dispatch($campaign->id)->delay(now()->addSeconds(10))->onQueue('email');
     }

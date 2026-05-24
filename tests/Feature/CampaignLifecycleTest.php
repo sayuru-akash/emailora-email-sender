@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\FinalizeEmailCampaign;
 use App\Jobs\PrepareEmailCampaignRecipients;
 use App\Jobs\SendEmailCampaignMessages;
 use App\Jobs\SendSingleEmail;
@@ -11,6 +12,7 @@ use App\Models\EmailCampaign;
 use App\Models\EmailMessage;
 use App\Models\ListModel;
 use App\Models\User;
+use App\Services\Email\CampaignCountRefresher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -412,5 +414,21 @@ class CampaignLifecycleTest extends TestCase
         $this->artisan('emailora:campaigns:recover')->assertSuccessful();
 
         Queue::assertPushed(SendEmailCampaignMessages::class, fn (SendEmailCampaignMessages $job): bool => $job->campaignId === $campaign->id);
+    }
+
+    public function test_finalize_rechecks_active_campaigns_until_recipients_finish(): void
+    {
+        Queue::fake();
+        $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
+        CampaignRecipient::query()->create([
+            'email_campaign_id' => $campaign->id,
+            'email_normalized' => 'queued@example.com',
+            'status' => 'queued',
+        ]);
+
+        (new FinalizeEmailCampaign($campaign->id))->handle(app(CampaignCountRefresher::class));
+
+        $this->assertSame('sending', $campaign->refresh()->status);
+        Queue::assertPushed(FinalizeEmailCampaign::class, fn (FinalizeEmailCampaign $job): bool => $job->campaignId === $campaign->id);
     }
 }
