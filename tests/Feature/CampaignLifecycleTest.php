@@ -8,9 +8,11 @@ use App\Jobs\SendSingleEmail;
 use App\Models\CampaignRecipient;
 use App\Models\Contact;
 use App\Models\EmailCampaign;
+use App\Models\EmailMessage;
 use App\Models\ListModel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -68,7 +70,10 @@ class CampaignLifecycleTest extends TestCase
         $user = User::factory()->create();
         $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
 
-        $this->actingAs($user)->delete(route('campaigns.destroy', $campaign))->assertStatus(422);
+        $this->actingAs($user)
+            ->delete(route('campaigns.destroy', $campaign))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Cancel the campaign before deleting.');
     }
 
     public function test_send_rejects_unknown_variables_but_allows_supported_variables(): void
@@ -186,15 +191,24 @@ class CampaignLifecycleTest extends TestCase
         $draft = EmailCampaign::factory()->create(['status' => 'draft']);
         $queued = EmailCampaign::factory()->create(['status' => 'queued']);
 
-        $this->actingAs($user)->post(route('campaigns.pause', $draft))->assertStatus(422);
+        $this->actingAs($user)
+            ->post(route('campaigns.pause', $draft))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only active campaigns can be paused.');
         $this->actingAs($user)->post(route('campaigns.pause', $queued))->assertRedirect();
         $this->assertSame('paused', $queued->refresh()->status);
 
-        $this->actingAs($user)->post(route('campaigns.resume', $draft))->assertStatus(422);
+        $this->actingAs($user)
+            ->post(route('campaigns.resume', $draft))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only paused campaigns can be resumed.');
         $this->actingAs($user)->post(route('campaigns.resume', $queued))->assertRedirect();
         $this->assertSame('queued', $queued->refresh()->status);
 
-        $this->actingAs($user)->post(route('campaigns.cancel', $draft))->assertStatus(422);
+        $this->actingAs($user)
+            ->post(route('campaigns.cancel', $draft))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only scheduled or active campaigns can be cancelled.');
         $this->actingAs($user)->post(route('campaigns.cancel', $queued))->assertRedirect();
         $this->assertSame('cancelled', $queued->refresh()->status);
     }
@@ -250,7 +264,8 @@ class CampaignLifecycleTest extends TestCase
 
         $this->actingAs(User::factory()->create())
             ->delete(route('campaigns.destroy', $campaign))
-            ->assertStatus(422);
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Cancel the campaign before deleting.');
 
         $this->assertModelExists($campaign);
     }
@@ -285,6 +300,38 @@ class CampaignLifecycleTest extends TestCase
         $this->assertSame($user->id, $copy->created_by);
     }
 
+    public function test_campaign_test_send_renders_sample_personalization_and_records_result(): void
+    {
+        Http::fake([
+            'api.brevo.com/*' => Http::response(['messageId' => 'brevo-test-id'], 201),
+        ]);
+
+        config(['emailora.brevo.api_key' => 'test-key']);
+
+        $campaign = EmailCampaign::factory()->create([
+            'provider' => 'brevo',
+            'subject' => 'Hi {{ name }}',
+            'html_body' => '<p>Hello {{ name }}</p><p><a href="{{ unsubscribe_url }}">Unsubscribe</a></p>',
+            'text_body' => 'Hello {{ name }}',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.send-test', $campaign), [
+                'to' => 'TestUser@Example.com',
+                'provider' => 'brevo',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Test email accepted by the provider.');
+
+        $message = EmailMessage::query()->firstOrFail();
+
+        $this->assertSame('testuser@example.com', $message->email_normalized);
+        $this->assertSame('sent', $message->status);
+        $this->assertSame('brevo-test-id', $message->provider_message_id);
+        $this->assertStringNotContainsString('{{ name }}', $message->html_body);
+        $this->assertStringContainsString('Sample Contact', $message->html_body);
+    }
+
     public function test_resend_failed_only_requeues_failed_ids_on_terminal_campaigns(): void
     {
         Queue::fake();
@@ -317,7 +364,8 @@ class CampaignLifecycleTest extends TestCase
 
         $this->actingAs(User::factory()->create())
             ->post(route('campaigns.resend-failed', $campaign))
-            ->assertStatus(422);
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only completed or failed campaigns can resend failed recipients.');
     }
 
     public function test_due_scheduled_campaigns_are_queued_by_command(): void

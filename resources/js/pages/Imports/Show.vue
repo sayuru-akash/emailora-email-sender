@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Download } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
@@ -17,7 +18,19 @@ const props = defineProps<{
 
 const activeStatuses = ['queued', 'processing'];
 const shouldPoll = computed(() => activeStatuses.includes(props.import.status));
+const deleteDialogOpen = ref(false);
+const deleting = ref(false);
 let pollId: number | undefined;
+
+function deleteImport() {
+    deleting.value = true;
+    router.delete(`/imports/${props.import.id}`, {
+        onFinish: () => {
+            deleting.value = false;
+            deleteDialogOpen.value = false;
+        },
+    });
+}
 
 function applyStatus(event: Event) {
     router.get(
@@ -66,6 +79,20 @@ onUnmounted(() => {
                     <Download class="h-4 w-4" />
                     Failed rows
                 </a>
+                <Link
+                    v-if="['uploaded', 'mapped'].includes(props.import.status)"
+                    class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                    :href="`/imports/${props.import.id}/mapping`"
+                >
+                    Continue mapping
+                </Link>
+                <button
+                    class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
+                    type="button"
+                    @click="deleteDialogOpen = true"
+                >
+                    Delete
+                </button>
                 <Link
                     class="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
                     href="/imports"
@@ -210,5 +237,14 @@ onUnmounted(() => {
                 </template>
             </TableShell>
         </section>
+        <ConfirmDialog
+            v-model="deleteDialogOpen"
+            title="Delete import"
+            description="This removes the uploaded file and import row results. Contacts already created by this import are not deleted."
+            confirm-label="Delete import"
+            destructive
+            :processing="deleting"
+            @confirm="deleteImport"
+        />
     </main>
 </template>

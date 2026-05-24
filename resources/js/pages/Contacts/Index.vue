@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
+import RowAction from '@/components/emailora/RowAction.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 
@@ -14,6 +16,8 @@ const props = defineProps<{
 }>();
 const search = ref(props.filters?.search ?? '');
 const selectedIds = ref<number[]>([]);
+const deleteDialogOpen = ref(false);
+const bulkProcessing = ref(false);
 const hasSelection = computed(() => selectedIds.value.length > 0);
 
 watch(search, (value) => {
@@ -29,13 +33,17 @@ function applyBulkAction(action: string) {
         return;
     }
 
-    if (
-        action === 'delete' &&
-        !window.confirm(`Delete ${selectedIds.value.length} selected contacts?`)
-    ) {
+    if (action === 'delete') {
+        deleteDialogOpen.value = true;
+
         return;
     }
 
+    submitBulkAction(action);
+}
+
+function submitBulkAction(action: string) {
+    bulkProcessing.value = true;
     router.post(
         '/contacts/bulk-action',
         { action, ids: selectedIds.value },
@@ -43,6 +51,10 @@ function applyBulkAction(action: string) {
             preserveScroll: true,
             onSuccess: () => {
                 selectedIds.value = [];
+            },
+            onFinish: () => {
+                bulkProcessing.value = false;
+                deleteDialogOpen.value = false;
             },
         },
     );
@@ -136,7 +148,7 @@ function togglePageSelection(event: Event) {
             <div class="flex flex-wrap gap-2 md:ml-auto">
                 <button
                     class="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
-                    :disabled="!hasSelection"
+                    :disabled="!hasSelection || bulkProcessing"
                     type="button"
                     @click="applyBulkAction('mark_inactive')"
                 >
@@ -144,7 +156,15 @@ function togglePageSelection(event: Event) {
                 </button>
                 <button
                     class="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
-                    :disabled="!hasSelection"
+                    :disabled="!hasSelection || bulkProcessing"
+                    type="button"
+                    @click="applyBulkAction('block')"
+                >
+                    Block
+                </button>
+                <button
+                    class="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
+                    :disabled="!hasSelection || bulkProcessing"
                     type="button"
                     @click="applyBulkAction('unsubscribe')"
                 >
@@ -152,7 +172,7 @@ function togglePageSelection(event: Event) {
                 </button>
                 <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive disabled:opacity-50"
-                    :disabled="!hasSelection"
+                    :disabled="!hasSelection || bulkProcessing"
                     type="button"
                     @click="applyBulkAction('delete')"
                 >
@@ -218,18 +238,18 @@ function togglePageSelection(event: Event) {
                         <td class="px-4 py-3 text-muted-foreground">
                             {{ contact.created_at }}
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex gap-2">
-                                <Link
-                                    class="text-primary"
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex justify-end gap-2">
+                                <RowAction
                                     :href="`/contacts/${contact.id}`"
-                                    >View</Link
-                                >
-                                <Link
-                                    class="text-muted-foreground hover:text-primary"
+                                    icon="view"
+                                    label="View"
+                                />
+                                <RowAction
                                     :href="`/contacts/${contact.id}/edit`"
-                                    >Edit</Link
-                                >
+                                    icon="edit"
+                                    label="Edit"
+                                />
                             </div>
                         </td>
                     </tr>
@@ -244,5 +264,14 @@ function togglePageSelection(event: Event) {
                 <Pagination :meta="props.contacts?.meta" />
             </template>
         </TableShell>
+        <ConfirmDialog
+            v-model="deleteDialogOpen"
+            title="Delete selected contacts"
+            :description="`This will delete ${selectedIds.length} selected contacts. Existing campaign history remains for reporting.`"
+            confirm-label="Delete contacts"
+            destructive
+            :processing="bulkProcessing"
+            @confirm="submitBulkAction('delete')"
+        />
     </main>
 </template>

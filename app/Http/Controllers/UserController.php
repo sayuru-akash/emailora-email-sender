@@ -54,7 +54,10 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user): RedirectResponse
     {
-        abort_if($request->user()->role === 'admin' && in_array($user->role, ['owner', 'admin'], true), 403);
+        if ($request->user()->role === 'admin' && in_array($user->role, ['owner', 'admin'], true)) {
+            return back()->with('error', 'Admins cannot edit owner or admin users.');
+        }
+
         $data = $request->validated();
         if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -68,8 +71,14 @@ class UserController extends Controller
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
-        abort_if($request->user()->is($user), 422, 'Users cannot delete themselves.');
-        abort_if($request->user()->role === 'admin' && in_array($user->role, ['owner', 'admin'], true), 403);
+        if ($request->user()->is($user)) {
+            return back()->with('error', 'Users cannot delete themselves.');
+        }
+
+        if ($request->user()->role === 'admin' && in_array($user->role, ['owner', 'admin'], true)) {
+            return back()->with('error', 'Admins cannot delete owner or admin users.');
+        }
+
         $user->delete();
 
         return back()->with('success', 'User deleted.');

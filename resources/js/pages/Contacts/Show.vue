@@ -1,14 +1,57 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 
 const props = defineProps<{ contact: any; recentMessages?: any[] }>();
+const deleteDialogOpen = ref(false);
+const contactActionDialogOpen = ref(false);
+const deleting = ref(false);
+const processingAction = ref<string | null>(null);
+const contactAction = ref({
+    action: '',
+    path: '',
+    title: '',
+    description: '',
+    confirmLabel: '',
+});
 
 function deleteContact() {
-    if (confirm('Delete this contact?')) {
-        router.delete(`/contacts/${props.contact.id}`);
-    }
+    deleting.value = true;
+    router.delete(`/contacts/${props.contact.id}`, {
+        onFinish: () => {
+            deleting.value = false;
+            deleteDialogOpen.value = false;
+        },
+    });
+}
+
+function requestContactAction(
+    action: string,
+    path: string,
+    title: string,
+    description: string,
+    confirmLabel: string,
+) {
+    contactAction.value = { action, path, title, description, confirmLabel };
+    contactActionDialogOpen.value = true;
+}
+
+function confirmContactAction() {
+    processingAction.value = contactAction.value.action;
+    router.post(
+        contactAction.value.path,
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                processingAction.value = null;
+                contactActionDialogOpen.value = false;
+            },
+        },
+    );
 }
 </script>
 
@@ -26,36 +69,53 @@ function deleteContact() {
                     >Back</Link
                 >
                 <Link
-                    class="rounded-md bg-primary px-3 py-2 text-sm text-white"
+                    class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                     :href="`/contacts/${props.contact.id}/edit`"
                     >Edit</Link
                 >
-                <Link
+                <button
                     v-if="props.contact.status !== 'unsubscribed'"
                     class="rounded-md border px-3 py-2 text-sm"
-                    :href="`/contacts/${props.contact.id}/unsubscribe`"
-                    method="post"
-                    as="button"
-                    preserve-scroll
-                    >Unsubscribe</Link
+                    type="button"
+                    @click="
+                        requestContactAction(
+                            'unsubscribe',
+                            `/contacts/${props.contact.id}/unsubscribe`,
+                            'Unsubscribe contact',
+                            'This contact will be suppressed from future campaign sends. Existing reporting remains unchanged.',
+                            'Unsubscribe contact',
+                        )
+                    "
                 >
-                <Link
+                    {{
+                        processingAction === 'unsubscribe'
+                            ? 'Updating...'
+                            : 'Unsubscribe'
+                    }}
+                </button>
+                <button
                     v-if="props.contact.status !== 'blocked'"
                     class="rounded-md border px-3 py-2 text-sm"
-                    :href="`/contacts/${props.contact.id}/block`"
-                    method="post"
-                    as="button"
-                    preserve-scroll
-                    >Block</Link
+                    type="button"
+                    @click="
+                        requestContactAction(
+                            'block',
+                            `/contacts/${props.contact.id}/block`,
+                            'Block contact',
+                            'This contact will be blocked from future sending and audience targeting.',
+                            'Block contact',
+                        )
+                    "
                 >
+                    {{ processingAction === 'block' ? 'Blocking...' : 'Block' }}
+                </button>
                 <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
                     type="button"
-                    @click="deleteContact"
+                    @click="deleteDialogOpen = true"
                 >
                     Delete
                 </button>
-                >
             </template>
         </PageHeader>
         <div class="grid gap-6 lg:grid-cols-3">
@@ -155,5 +215,23 @@ function deleteContact() {
                 </div>
             </section>
         </div>
+        <ConfirmDialog
+            v-model="deleteDialogOpen"
+            title="Delete contact"
+            description="This removes the contact from audiences and future campaign targeting. Existing message history remains for reporting."
+            confirm-label="Delete contact"
+            destructive
+            :processing="deleting"
+            @confirm="deleteContact"
+        />
+        <ConfirmDialog
+            v-model="contactActionDialogOpen"
+            :title="contactAction.title"
+            :description="contactAction.description"
+            :confirm-label="contactAction.confirmLabel"
+            destructive
+            :processing="processingAction === contactAction.action"
+            @confirm="confirmContactAction"
+        />
     </main>
 </template>

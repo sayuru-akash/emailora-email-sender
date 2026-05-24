@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
+import RowAction from '@/components/emailora/RowAction.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ campaigns?: any; filters?: any }>();
@@ -41,7 +42,7 @@ function applyFilters(updates: Record<string, string>) {
         >
             <template #actions
                 ><Link
-                    class="rounded-md bg-primary px-3 py-2 text-sm text-white"
+                    class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                     href="/campaigns/builder"
                     >New Campaign</Link
                 ></template
@@ -97,6 +98,18 @@ function applyFilters(updates: Record<string, string>) {
                 v-if="(props.campaigns?.data ?? []).length"
                 class="w-full text-sm"
             >
+                <thead
+                    class="bg-muted text-left text-xs text-muted-foreground uppercase"
+                >
+                    <tr>
+                        <th class="px-4 py-3">Campaign</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Recipients</th>
+                        <th class="px-4 py-3">Sent</th>
+                        <th class="px-4 py-3">Failed</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
                 <tbody class="divide-y">
                     <tr
                         v-for="campaign in props.campaigns.data"
@@ -125,38 +138,37 @@ function applyFilters(updates: Record<string, string>) {
                         </td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex justify-end gap-2">
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted"
+                                <RowAction
                                     :href="`/campaigns/${campaign.id}`"
-                                    >Open</Link
-                                >
-                                <Link
+                                    icon="view"
+                                    label="Open"
+                                />
+                                <RowAction
                                     v-if="
                                         ['draft', 'scheduled'].includes(
                                             campaign.status,
                                         )
                                     "
-                                    class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted"
                                     :href="`/campaigns/${campaign.id}/edit`"
-                                    >Edit</Link
-                                >
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted"
+                                    icon="edit"
+                                    label="Edit"
+                                />
+                                <RowAction
                                     :href="`/campaigns/${campaign.id}/duplicate`"
+                                    icon="duplicate"
+                                    label="Duplicate"
                                     method="post"
-                                    as="button"
-                                    >Duplicate</Link
-                                >
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted"
+                                />
+                                <RowAction
                                     :href="`/campaigns/${campaign.id}/recipients`"
-                                    >Recipients</Link
-                                >
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted"
+                                    icon="recipients"
+                                    label="Recipients"
+                                />
+                                <RowAction
                                     :href="`/campaigns/${campaign.id}/report`"
-                                    >Report</Link
-                                >
+                                    icon="report"
+                                    label="Report"
+                                />
                             </div>
                         </td>
                     </tr>

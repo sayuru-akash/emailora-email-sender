@@ -156,7 +156,7 @@ function sendTestEmail() {
                 }}
             </div>
             <button
-                class="rounded-md bg-primary px-3 py-2 text-sm text-white disabled:opacity-60"
+                class="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
                 :disabled="form.processing"
             >
                 Save

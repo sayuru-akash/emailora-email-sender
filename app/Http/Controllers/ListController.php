@@ -52,8 +52,18 @@ class ListController extends Controller
     public function show(Request $request, ListModel $list): Response
     {
         $contacts = $list->contacts()->search($request->string('search')->toString())->latest('contacts.created_at')->paginate($this->perPage($request->input('per_page')))->withQueryString();
+        $availableContacts = Contact::active()
+            ->whereNotIn('id', $list->contacts()->select('contacts.id'))
+            ->orderBy('email')
+            ->limit(100)
+            ->get(['id', 'full_name', 'email']);
 
-        return Inertia::render('Lists/Show', ['list' => $list, 'contacts' => $this->pagination($contacts), 'filters' => $request->only(['search', 'per_page'])]);
+        return Inertia::render('Lists/Show', [
+            'list' => $list,
+            'contacts' => $this->pagination($contacts),
+            'availableContacts' => $availableContacts,
+            'filters' => $request->only(['search', 'per_page']),
+        ]);
     }
 
     public function edit(ListModel $list): Response

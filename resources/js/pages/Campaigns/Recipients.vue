@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
+import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
+import RowAction from '@/components/emailora/RowAction.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{
@@ -12,6 +14,7 @@ const props = defineProps<{
     mode?: 'target_audience' | 'prepared_recipients';
 }>();
 const processingAction = ref<string | null>(null);
+const resendAllDialogOpen = ref(false);
 const statuses = [
     { label: 'All', value: '' },
     { label: 'Pending', value: 'pending' },
@@ -39,10 +42,6 @@ function filterStatus(event: Event) {
 }
 
 function resendFailed() {
-    if (!window.confirm('Retry all failed recipients?')) {
-        return;
-    }
-
     processingAction.value = 'resend-all';
     router.post(
         `/campaigns/${props.campaign.id}/resend-failed`,
@@ -51,6 +50,7 @@ function resendFailed() {
             preserveScroll: true,
             onFinish: () => {
                 processingAction.value = null;
+                resendAllDialogOpen.value = false;
             },
         },
     );
@@ -93,7 +93,7 @@ function retryRecipient(id: number) {
                 v-if="props.campaign.failed_count > 0"
                 class="rounded-md border bg-card px-3 py-2 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="Boolean(processingAction)"
-                @click="resendFailed"
+                @click="resendAllDialogOpen = true"
             >
                 {{
                     processingAction === 'resend-all'
@@ -156,18 +156,17 @@ function retryRecipient(id: number) {
                             {{ r.error_message ?? '-' }}
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <button
+                            <RowAction
                                 v-if="r.status === 'failed'"
-                                class="rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                                 :disabled="Boolean(processingAction)"
-                                @click="retryRecipient(r.id)"
-                            >
-                                {{
+                                icon="continue"
+                                :label="
                                     processingAction === `retry-${r.id}`
-                                        ? 'Queueing...'
+                                        ? 'Queueing'
                                         : 'Retry'
-                                }}
-                            </button>
+                                "
+                                @click="retryRecipient(r.id)"
+                            />
                             <span v-else class="text-xs text-muted-foreground"
                                 >-</span
                             >
@@ -180,5 +179,13 @@ function retryRecipient(id: number) {
                 <Pagination :meta="props.recipients?.meta" />
             </template>
         </TableShell>
+        <ConfirmDialog
+            v-model="resendAllDialogOpen"
+            title="Retry failed recipients"
+            description="All failed recipients for this campaign will be queued again. Recipients that already sent successfully are not changed."
+            confirm-label="Queue retries"
+            :processing="processingAction === 'resend-all'"
+            @confirm="resendFailed"
+        />
     </main>
 </template>

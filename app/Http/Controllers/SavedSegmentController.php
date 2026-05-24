@@ -25,19 +25,40 @@ class SavedSegmentController extends Controller
         ]);
     }
 
+    public function create(): Response
+    {
+        return Inertia::render('Segments/Form', [
+            'segment' => null,
+            'defaultFilters' => [
+                'status' => 'active',
+                'source' => null,
+                'tags' => [],
+                'lists' => [],
+            ],
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:180'], 'description' => ['nullable', 'string'], 'filters' => ['required', 'array'], 'status' => ['required', 'in:active,inactive']]);
         $data['slug'] = Str::slug($data['name']);
         $data['created_by'] = $request->user()->id;
-        SavedSegment::create($data);
+        $segment = SavedSegment::create($data);
 
-        return back()->with('success', 'Segment saved.');
+        return redirect()->route('segments.show', $segment)->with('success', 'Segment saved.');
     }
 
     public function show(SavedSegment $segment): Response
     {
         return Inertia::render('Segments/Show', ['segment' => $segment]);
+    }
+
+    public function edit(SavedSegment $segment): Response
+    {
+        return Inertia::render('Segments/Form', [
+            'segment' => $segment,
+            'defaultFilters' => $segment->filters,
+        ]);
     }
 
     public function update(Request $request, SavedSegment $segment): RedirectResponse

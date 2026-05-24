@@ -15,7 +15,7 @@ const page = usePage();
                 }}
             </p>
             <button
-                class="mt-5 rounded-md bg-primary px-3 py-2 text-sm text-white"
+                class="mt-5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
                 @click="router.post(`/unsubscribe/${props.token}`)"
             >
                 Confirm

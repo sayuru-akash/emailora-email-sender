@@ -4,6 +4,7 @@ import { ref, watch } from 'vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
+import RowAction from '@/components/emailora/RowAction.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 
@@ -73,16 +74,16 @@ watch(search, (value) => {
                         </td>
                         <td class="px-4 py-3 text-right">
                             <div class="flex justify-end gap-2">
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs"
+                                <RowAction
                                     :href="`/lists/${list.id}`"
-                                    >Open</Link
-                                >
-                                <Link
-                                    class="rounded-md border px-2.5 py-1.5 text-xs"
+                                    icon="view"
+                                    label="Open"
+                                />
+                                <RowAction
                                     :href="`/lists/${list.id}/edit`"
-                                    >Edit</Link
-                                >
+                                    icon="edit"
+                                    label="Edit"
+                                />
                             </div>
                         </td>
                     </tr>

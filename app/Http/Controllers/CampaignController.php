@@ -10,18 +10,22 @@ use App\Jobs\SendSingleEmail;
 use App\Models\CampaignRecipient;
 use App\Models\Contact;
 use App\Models\EmailCampaign;
+use App\Models\EmailMessage;
 use App\Models\EmailTemplate;
 use App\Models\ListModel;
 use App\Models\Tag;
 use App\Services\Activity\ActivityLogger;
 use App\Services\Email\AudienceResolver;
 use App\Services\Email\CampaignCountRefresher;
+use App\Services\Email\EmailPayload;
 use App\Services\Email\EmailPersonalizer;
 use App\Services\Email\EmailPreviewDocument;
+use App\Services\Email\EmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -113,7 +117,10 @@ class CampaignController extends Controller
 
     public function destroy(EmailCampaign $campaign): RedirectResponse
     {
-        abort_if(in_array($campaign->status, ['queued', 'preparing', 'sending', 'paused'], true), 422, 'Cancel the campaign before deleting.');
+        if (in_array($campaign->status, ['queued', 'preparing', 'sending', 'paused'], true)) {
+            return back()->with('error', 'Cancel the campaign before deleting.');
+        }
+
         $campaign->delete();
 
         return redirect()->route('campaigns.index')->with('success', 'Campaign deleted.');
@@ -147,7 +154,9 @@ class CampaignController extends Controller
 
     public function send(CampaignSendRequest $request, EmailCampaign $campaign, AudienceResolver $resolver, EmailPersonalizer $personalizer): RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['draft', 'scheduled'], true), 422, 'Only draft or scheduled campaigns can be sent.');
+        if (! in_array($campaign->status, ['draft', 'scheduled'], true)) {
+            return back()->with('error', 'Only draft or scheduled campaigns can be sent.');
+        }
 
         $campaign->update($this->withUnsubscribeToken([
             'html_body' => $campaign->html_body,
@@ -188,7 +197,9 @@ class CampaignController extends Controller
 
     public function pause(EmailCampaign $campaign): RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['queued', 'preparing', 'sending'], true), 422, 'Only active campaigns can be paused.');
+        if (! in_array($campaign->status, ['queued', 'preparing', 'sending'], true)) {
+            return back()->with('error', 'Only active campaigns can be paused.');
+        }
 
         $campaign->update(['status' => 'paused']);
         app(ActivityLogger::class)->log('campaign.paused', 'Campaign was paused.', $campaign, [], 'campaigns', 'warning');
@@ -198,7 +209,9 @@ class CampaignController extends Controller
 
     public function resume(EmailCampaign $campaign): RedirectResponse
     {
-        abort_unless($campaign->status === 'paused', 422, 'Only paused campaigns can be resumed.');
+        if ($campaign->status !== 'paused') {
+            return back()->with('error', 'Only paused campaigns can be resumed.');
+        }
 
         $campaign->update(['status' => 'queued']);
         PrepareEmailCampaignRecipients::dispatch($campaign->id, $campaign->recipient_mode ?: 'current_audience')->onQueue('email');
@@ -211,7 +224,9 @@ class CampaignController extends Controller
 
     public function cancel(EmailCampaign $campaign): RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['scheduled', 'queued', 'preparing', 'sending', 'paused'], true), 422, 'Only scheduled or active campaigns can be cancelled.');
+        if (! in_array($campaign->status, ['scheduled', 'queued', 'preparing', 'sending', 'paused'], true)) {
+            return back()->with('error', 'Only scheduled or active campaigns can be cancelled.');
+        }
 
         $campaign->update(['status' => 'cancelled', 'completed_at' => now()]);
         app(ActivityLogger::class)->log('campaign.cancelled', 'Campaign was cancelled.', $campaign, [], 'campaigns', 'warning');
@@ -221,10 +236,14 @@ class CampaignController extends Controller
 
     public function resendFailed(EmailCampaign $campaign): RedirectResponse
     {
-        abort_unless(in_array($campaign->status, ['completed', 'failed'], true), 422, 'Only completed or failed campaigns can resend failed recipients.');
+        if (! in_array($campaign->status, ['completed', 'failed'], true)) {
+            return back()->with('error', 'Only completed or failed campaigns can resend failed recipients.');
+        }
 
         $failedIds = $campaign->recipients()->where('status', 'failed')->pluck('id');
-        abort_unless($failedIds->isNotEmpty(), 422, 'There are no failed recipients to resend.');
+        if ($failedIds->isEmpty()) {
+            return back()->with('error', 'There are no failed recipients to resend.');
+        }
 
         $campaign->recipients()->whereIn('id', $failedIds)->update(['status' => 'queued', 'error_message' => null]);
         $failedIds->each(fn ($id) => SendSingleEmail::dispatch($id)->onQueue('email'));
@@ -239,8 +258,13 @@ class CampaignController extends Controller
     public function resendRecipient(EmailCampaign $campaign, CampaignRecipient $recipient): RedirectResponse
     {
         abort_unless($recipient->email_campaign_id === $campaign->id, 404);
-        abort_unless(in_array($campaign->status, ['completed', 'failed'], true), 422, 'Only completed or failed campaigns can retry failed recipients.');
-        abort_unless($recipient->status === 'failed', 422, 'Only failed recipients can be retried.');
+        if (! in_array($campaign->status, ['completed', 'failed'], true)) {
+            return back()->with('error', 'Only completed or failed campaigns can retry failed recipients.');
+        }
+
+        if ($recipient->status !== 'failed') {
+            return back()->with('error', 'Only failed recipients can be retried.');
+        }
         $recipient->update(['status' => 'queued', 'error_message' => null]);
         SendSingleEmail::dispatch($recipient->id)->onQueue('email');
         app(ActivityLogger::class)->log('campaign.recipient_requeued', 'Campaign recipient was requeued.', $campaign, [
@@ -320,9 +344,72 @@ class CampaignController extends Controller
         return Inertia::render('Campaigns/Report', ['campaign' => $refresher->refresh($campaign), 'breakdown' => $campaign->recipients()->selectRaw('status, count(*) as total')->groupBy('status')->get()]);
     }
 
-    public function sendTest(): RedirectResponse
+    public function sendTest(Request $request, EmailCampaign $campaign, EmailService $email, EmailPersonalizer $personalizer): RedirectResponse
     {
-        return back()->withErrors(['provider' => 'Test email requires provider configuration.']);
+        $data = $request->validate([
+            'to' => ['required', 'email'],
+            'provider' => ['nullable', 'in:auto,resend,brevo'],
+        ]);
+
+        $metadataKeys = $personalizer->metadataKeysFromContacts();
+        $content = $this->personalizableContent($campaign);
+        $warnings = $personalizer->unresolvedVariables($content, $metadataKeys);
+        if ($warnings) {
+            return back()->withErrors(['campaign' => 'Unresolved variables remain: '.implode(', ', $warnings)]);
+        }
+
+        $provider = ($data['provider'] ?? 'auto') === 'auto' ? null : $data['provider'];
+        $payload = new EmailPayload(
+            to: $data['to'],
+            subject: $personalizer->renderSample((string) $campaign->subject, $metadataKeys),
+            html: $personalizer->renderSample((string) $campaign->html_body, $metadataKeys),
+            text: $campaign->text_body ? $personalizer->renderSample((string) $campaign->text_body, $metadataKeys) : null,
+            fromEmail: $campaign->from_email ?: (string) config('emailora.from_email'),
+            fromName: $campaign->from_name ?: (string) config('emailora.from_name'),
+            replyTo: $campaign->reply_to_email ?: config('emailora.reply_to'),
+            tags: ['campaign_id' => $campaign->id, 'test' => true],
+            idempotencyKey: "campaign:{$campaign->id}:test:".Str::uuid(),
+        );
+
+        $result = $email->send($payload, $provider);
+
+        EmailMessage::create([
+            'email_campaign_id' => $campaign->id,
+            'email_normalized' => Str::lower($data['to']),
+            'from_email' => $payload->fromEmail,
+            'from_name' => $payload->fromName,
+            'reply_to_email' => $payload->replyTo,
+            'subject' => $payload->subject,
+            'html_body' => $payload->html,
+            'text_body' => $payload->text,
+            'provider' => $provider ?: ($campaign->provider ?: config('emailora.provider')),
+            'provider_message_id' => $result->providerMessageId,
+            'status' => $result->accepted ? 'sent' : 'failed',
+            'provider_response' => $result->response,
+            'error_message' => $result->errorMessage,
+            'sent_at' => $result->accepted ? now() : null,
+            'failed_at' => $result->accepted ? null : now(),
+        ]);
+
+        app(ActivityLogger::class)->log(
+            $result->accepted ? 'campaign.test_email_sent' : 'campaign.test_email_failed',
+            $result->accepted ? 'Campaign test email was accepted by the provider.' : 'Campaign test email failed.',
+            $campaign,
+            [
+                'to' => Str::lower($data['to']),
+                'provider' => $provider ?: 'auto',
+                'failure_type' => $result->failureType,
+                'error_message' => $result->errorMessage,
+            ],
+            'campaigns',
+            $result->accepted ? 'info' : 'error',
+        );
+
+        if (! $result->accepted) {
+            return back()->with('error', $result->errorMessage ?: 'Provider rejected the test email.');
+        }
+
+        return back()->with('success', 'Test email accepted by the provider.');
     }
 
     private function builderProps(?EmailCampaign $campaign, EmailPersonalizer $personalizer): array

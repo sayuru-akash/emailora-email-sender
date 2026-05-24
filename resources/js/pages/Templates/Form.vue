@@ -473,7 +473,7 @@ function submit() {
                         Cancel
                     </Link>
                     <button
-                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="form.processing || !hasRequiredContent"
                     >
                         <Check class="h-4 w-4" />

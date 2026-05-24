@@ -105,6 +105,34 @@ class ContactListTagCrudTest extends TestCase
         $this->assertSame('cca-updated', $list->refresh()->slug);
     }
 
+    public function test_list_membership_can_be_managed_from_list_actions(): void
+    {
+        $user = User::factory()->create();
+        $list = ListModel::factory()->create();
+        $first = Contact::factory()->create();
+        $second = Contact::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('lists.add-contacts', $list), [
+                'contact_ids' => [$first->id, $second->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Contacts added.');
+
+        $this->assertTrue($list->contacts()->whereKey($first->id)->exists());
+        $this->assertTrue($list->contacts()->whereKey($second->id)->exists());
+
+        $this->actingAs($user)
+            ->post(route('lists.remove-contacts', $list), [
+                'contact_ids' => [$first->id],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Contacts removed.');
+
+        $this->assertFalse($list->contacts()->whereKey($first->id)->exists());
+        $this->assertTrue($list->contacts()->whereKey($second->id)->exists());
+    }
+
     public function test_tag_create_edit_and_duplicate_validation(): void
     {
         $user = User::factory()->create();

@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { BarChart3, Download, TrendingUp } from 'lucide-vue-next';
 import PageHeader from '@/components/emailora/PageHeader.vue';
+import RowAction from '@/components/emailora/RowAction.vue';
 import StatCard from '@/components/emailora/StatCard.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
@@ -317,7 +318,7 @@ function barWidth(value: number, total: number) {
                             <th class="px-4 py-3">Delivery</th>
                             <th class="px-4 py-3">Open</th>
                             <th class="px-4 py-3">Click</th>
-                            <th class="px-4 py-3">Actions</th>
+                            <th class="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -349,18 +350,18 @@ function barWidth(value: number, total: number) {
                             <td class="px-4 py-3">
                                 {{ campaign.click_rate }}%
                             </td>
-                            <td class="px-4 py-3">
-                                <div class="flex gap-3">
-                                    <Link
-                                        class="text-primary"
+                            <td class="px-4 py-3 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <RowAction
                                         :href="`/reports/campaigns/${campaign.id}`"
-                                        >Report</Link
-                                    >
+                                        icon="report"
+                                        label="Report"
+                                    />
                                     <a
-                                        class="inline-flex items-center gap-1 text-muted-foreground hover:text-primary"
+                                        class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
                                         :href="`/reports/campaigns/${campaign.id}/export`"
                                     >
-                                        <Download class="h-4 w-4" />
+                                        <Download class="size-3.5" />
                                         CSV
                                     </a>
                                 </div>

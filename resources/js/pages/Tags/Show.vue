@@ -1,16 +1,24 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import ConfirmDialog from '@/components/emailora/ConfirmDialog.vue';
 import EmptyState from '@/components/emailora/EmptyState.vue';
 import PageHeader from '@/components/emailora/PageHeader.vue';
 import Pagination from '@/components/emailora/Pagination.vue';
 import StatusBadge from '@/components/emailora/StatusBadge.vue';
 import TableShell from '@/components/emailora/TableShell.vue';
 const props = defineProps<{ tag: any; contacts?: any }>();
+const deleteDialogOpen = ref(false);
+const deleting = ref(false);
 
 function deleteTag() {
-    if (confirm('Delete this tag?')) {
-        router.delete(`/tags/${props.tag.id}`);
-    }
+    deleting.value = true;
+    router.delete(`/tags/${props.tag.id}`, {
+        onFinish: () => {
+            deleting.value = false;
+            deleteDialogOpen.value = false;
+        },
+    });
 }
 </script>
 <template>
@@ -29,11 +37,10 @@ function deleteTag() {
                 <button
                     class="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive"
                     type="button"
-                    @click="deleteTag"
+                    @click="deleteDialogOpen = true"
                 >
                     Delete
                 </button>
-                >
             </template>
         </PageHeader>
         <TableShell min-width="820px">
@@ -72,5 +79,14 @@ function deleteTag() {
                 <Pagination :meta="props.contacts?.meta" />
             </template>
         </TableShell>
+        <ConfirmDialog
+            v-model="deleteDialogOpen"
+            title="Delete tag"
+            description="Contacts will remain in the system, but this tag will be removed from every contact."
+            confirm-label="Delete tag"
+            destructive
+            :processing="deleting"
+            @confirm="deleteTag"
+        />
     </main>
 </template>
