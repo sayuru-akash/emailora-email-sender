@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsTableProps;
 use App\Models\SavedSegment;
+use App\Services\Email\AudienceResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -75,8 +76,19 @@ class SavedSegmentController extends Controller
         return back()->with('success', 'Segment deleted.');
     }
 
-    public function preview(SavedSegment $segment): JsonResponse
+    public function preview(SavedSegment $segment, AudienceResolver $resolver): JsonResponse
     {
-        return response()->json(['count' => 0, 'contacts' => []]);
+        $query = $resolver->queryForFilters($segment->filters ?? []);
+
+        return response()->json([
+            'count' => (clone $query)->count(),
+            'contacts' => $query->latest()->limit(20)->get(['id', 'full_name', 'first_name', 'last_name', 'email', 'company', 'status'])->map(fn ($contact): array => [
+                'id' => $contact->id,
+                'name' => $contact->display_name,
+                'email' => $contact->email,
+                'company' => $contact->company,
+                'status' => $contact->status,
+            ]),
+        ]);
     }
 }

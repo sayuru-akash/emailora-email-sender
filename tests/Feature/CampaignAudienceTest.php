@@ -7,6 +7,8 @@ use App\Models\Contact;
 use App\Models\EmailCampaign;
 use App\Models\EmailSuppression;
 use App\Models\ListModel;
+use App\Models\SavedSegment;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -45,6 +47,50 @@ class CampaignAudienceTest extends TestCase
             ->assertJsonPath('count', 2)
             ->assertJsonPath('suppressed_count', 1)
             ->assertJsonPath('sendable_count', 1);
+    }
+
+    public function test_audience_estimate_supports_saved_segments(): void
+    {
+        $target = Contact::factory()->create(['status' => 'active', 'source' => 'import']);
+        Contact::factory()->create(['status' => 'active', 'source' => 'manual']);
+
+        $segment = SavedSegment::query()->create([
+            'name' => 'Imported contacts',
+            'slug' => 'imported-contacts',
+            'status' => 'active',
+            'filters' => ['source' => 'import'],
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->postJson(route('campaigns.audience.estimate'), [
+                'target_type' => 'saved_segment',
+                'target_filters' => ['segment_id' => $segment->id],
+            ])
+            ->assertOk()
+            ->assertJsonPath('sendable_count', 1);
+
+        $this->assertSame('import', $target->source);
+    }
+
+    public function test_saved_segment_preview_returns_matching_contacts(): void
+    {
+        $tag = Tag::factory()->create();
+        $target = Contact::factory()->create(['full_name' => 'Segment Student', 'status' => 'active']);
+        $tag->contacts()->attach($target->id);
+        Contact::factory()->create(['full_name' => 'Other Student', 'status' => 'active']);
+
+        $segment = SavedSegment::query()->create([
+            'name' => 'Tagged students',
+            'slug' => 'tagged-students',
+            'status' => 'active',
+            'filters' => ['tag_ids' => [$tag->id]],
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->postJson(route('segments.preview', $segment))
+            ->assertOk()
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('contacts.0.email', $target->email);
     }
 
     public function test_send_rejects_empty_audience(): void
