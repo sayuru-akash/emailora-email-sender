@@ -15,6 +15,7 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 
 - Backend: Laravel 13 controllers, Form Requests, Eloquent models, database queues.
 - Frontend: Inertia Vue pages in `resources/js/pages`, shared Emailora UI in `resources/js/components/emailora`.
+- Public marketing/legal pages use `resources/js/layouts/public/PublicLayout.vue` and are intentionally outside the authenticated app shell.
 - Use existing table pagination via `BuildsTableProps` and `Pagination.vue`.
 - Use `TableShell` for horizontally scrollable tables.
 - Render validation errors beside fields with `InputError`.

@@ -2,6 +2,8 @@
 
 Emailora is a Laravel + Inertia + Vue email contact management and campaign operations console.
 
+The public surface includes a lightweight homepage at `/`, plus `/privacy` and `/terms`. The authenticated workspace remains at `/dashboard`.
+
 ## Stack
 
 - Laravel 13, PHP 8.3+

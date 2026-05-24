@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -13,6 +14,7 @@ class ExampleTest extends TestCase
     {
         $response = $this->get(route('home'));
 
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page->component('Welcome'));
     }
 }

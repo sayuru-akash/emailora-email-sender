@@ -8,6 +8,7 @@ use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\ListController;
+use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedSegmentController;
 use App\Http\Controllers\SettingController;
@@ -18,7 +19,9 @@ use App\Http\Controllers\Webhooks\BrevoWebhookController;
 use App\Http\Controllers\Webhooks\ResendWebhookController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/dashboard')->name('home');
+Route::get('/', [PublicPageController::class, 'home'])->name('home');
+Route::get('/privacy', [PublicPageController::class, 'privacy'])->name('privacy');
+Route::get('/terms', [PublicPageController::class, 'terms'])->name('terms');
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/global-search', GlobalSearchController::class)->name('global-search');
