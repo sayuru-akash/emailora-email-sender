@@ -109,6 +109,17 @@ class ImportController extends Controller
     public function mapping(ContactImport $import, ContactImportFile $files): Response
     {
         $analysis = $import->preview_rows ?: $files->analyze($import, $import->mapping ?: null);
+        $analysis = array_replace_recursive([
+            'headers' => [],
+            'mapping' => [],
+            'preview_rows' => [],
+            'summary' => [
+                'total_rows' => 0,
+                'valid_rows' => 0,
+                'invalid_rows' => 0,
+                'duplicate_rows' => 0,
+            ],
+        ], $analysis);
 
         if (! $import->preview_rows) {
             $import->update([
@@ -131,6 +142,19 @@ class ImportController extends Controller
     public function preview(ImportMappingRequest $request, ContactImport $import, ContactImportFile $files, ActivityLogger $activity): RedirectResponse
     {
         $mapping = $request->validated('mapping');
+        $headers = $import->preview_rows['headers'] ?? $files->analyze($import)['headers'];
+        $unknownColumns = collect($mapping)
+            ->filter(fn ($column) => filled($column) && ! in_array($column, $headers, true))
+            ->keys()
+            ->map(fn ($field) => "mapping.{$field}")
+            ->all();
+
+        if ($unknownColumns !== []) {
+            return back()
+                ->withErrors(collect($unknownColumns)->mapWithKeys(fn ($field) => [$field => 'Choose a column from the uploaded file.'])->all())
+                ->withInput();
+        }
+
         $analysis = $files->analyze($import, $mapping);
         $import->update([
             'mapping' => $mapping,

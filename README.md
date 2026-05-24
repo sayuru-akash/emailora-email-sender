@@ -4,6 +4,20 @@ Emailora is a Laravel + Inertia + Vue email contact management and campaign oper
 
 The public surface includes a lightweight SEO-ready homepage at `/`, plus `/privacy`, `/terms`, `/robots.txt`, and `/sitemap.xml`. The authenticated workspace remains at `/dashboard`.
 
+## Screenshots
+
+Screenshots below are captured from a sanitized demo database, not local contact or campaign data.
+
+![Emailora public homepage](docs/assets/readme/emailora-home-desktop.webp)
+
+| Dashboard | Campaign Builder |
+| --- | --- |
+| ![Emailora dashboard](docs/assets/readme/emailora-dashboard-desktop.webp) | ![Emailora campaign builder](docs/assets/readme/emailora-campaign-builder.webp) |
+
+| Import Validation Preview | Reports |
+| --- | --- |
+| ![Emailora import validation preview](docs/assets/readme/emailora-import-preview.webp) | ![Emailora reports dashboard](docs/assets/readme/emailora-reports.webp) |
+
 ## Stack
 
 - Laravel 13, PHP 8.3+
@@ -106,6 +120,8 @@ Imports support `.csv`, `.txt`, and `.xlsx` files up to 20 MB. The import page p
 
 The import workflow is upload, validation preview, mapping adjustment, then confirm. The preview shows detected headers, valid rows, invalid rows, duplicate rows, warnings, and sample row data before contacts are created or updated. Failed processed rows are stored and can be downloaded from the import detail page.
 
+![Import validation preview](docs/assets/readme/emailora-import-preview.webp)
+
 Duplicate modes:
 
 - `skip`: create only new contacts and leave existing contacts unchanged.
@@ -126,6 +142,8 @@ Activity logs include user email, IP address, user agent, and operational metada
 ## Campaign Variables And Sending
 
 Templates and campaigns support both modern `{{ variable }}` tokens and legacy `{variable}` tokens. Common variables include contact fields such as `{{ name }}`, `{{ email }}`, `{{ first_name }}`, `{{ last_name }}`, `{{ company }}`, `{{ phone }}`, location fields, `{{ metadata.key }}`, and `{{ unsubscribe_url }}`.
+
+![Campaign builder with dynamic variables](docs/assets/readme/emailora-campaign-builder.webp)
 
 `{{ name }}` resolves to the best available display name: full name, first/last name, company, then email. Before sending, unresolved variables are blocked so a campaign does not ship raw placeholders.
 
@@ -155,6 +173,8 @@ php artisan config:cache
 php artisan view:cache
 php artisan optimize:clear
 ```
+
+The feature suite covers public SEO metadata, stateless robots/sitemap responses, authenticated workspace route smokes, imports, contacts, lists/tags, templates, campaigns, reports, settings, users, one-click unsubscribe, webhook acceptance/rejection, webhook event idempotency, and inactive-user workspace boundaries.
 
 Before deploying production assets, ensure `public/hot` is not present, `npm run build` has been run, and `APP_URL` is the final public origin.
 

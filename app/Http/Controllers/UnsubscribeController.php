@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CampaignRecipient;
 use App\Models\EmailSuppression;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,6 +27,7 @@ class UnsubscribeController extends Controller
             ['reason' => 'unsubscribed', 'email_campaign_id' => $recipient->email_campaign_id, 'metadata' => ['source' => 'one_click']]
         );
 
-        return redirect()->route('unsubscribe.show', $signedToken)->with('success', 'Unsubscribe recorded.');
+        return redirect(URL::signedRoute('unsubscribe.show', ['signedToken' => $signedToken]))
+            ->with('success', 'Unsubscribe recorded.');
     }
 }

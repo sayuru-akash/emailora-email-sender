@@ -34,6 +34,7 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Import files are private local storage. Delete stored files when deleting imports and mark processing failures as failed instead of leaving jobs stuck in `queued` or `processing`.
 - Activity logs live in `activity_logs` and `/activity-logs` is owner/admin-only. Use semantic aggregate logs for bulk operations and queue/webhook actions because query updates and pivot syncs do not fire model observers.
 - Do not store provider payloads, raw import rows, personalized bodies, tokens, headers, signatures, cookies, or API keys in activity properties. Use the recursive redaction path in `ActivityLogger` and model allowlists in `ActivityLogObserver`.
+- Settings/profile/security/appearance routes must stay behind `auth` and `active`; inactive users should be logged out before reaching workspace settings surfaces.
 
 ## Personalization
 
@@ -62,6 +63,7 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Do not echo provider secrets in chat or logs.
 - Brevo rejects empty optional fields such as an empty `headers` object; provider payloads should omit optional keys when empty.
 - `EmailPayload::$idempotencyKey` exists but is not yet wired to provider-specific idempotency headers. Treat retry/double-send risk seriously around provider sends.
+- Webhook controllers dispatch `EmailWebhookEvent` objects to the `email` queue and must log only sanitized provider, event type, and provider message id. Keep duplicate provider events idempotent.
 
 ## Verification
 

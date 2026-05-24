@@ -22,7 +22,7 @@ class SeoMetadataTest extends TestCase
     {
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('<title data-inertia>Email Campaign Operations Platform - Emailora</title>', false)
+            ->assertSee('<title>Email Campaign Operations Platform - Emailora</title>', false)
             ->assertSee('<meta name="description" content="Emailora is a clean campaign operations console for contact imports, audience targeting, templates, queued email sends, reporting, and audit logs."', false)
             ->assertSee('<meta name="robots" content="index,follow"', false)
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/"', false)
@@ -39,13 +39,13 @@ class SeoMetadataTest extends TestCase
     {
         $this->get(route('privacy'))
             ->assertOk()
-            ->assertSee('<title data-inertia>Privacy Policy - Emailora</title>', false)
+            ->assertSee('<title>Privacy Policy - Emailora</title>', false)
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/privacy"', false)
             ->assertSee('<meta property="og:type" content="article"', false);
 
         $this->get(route('terms'))
             ->assertOk()
-            ->assertSee('<title data-inertia>Terms of Use - Emailora</title>', false)
+            ->assertSee('<title>Terms of Use - Emailora</title>', false)
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/terms"', false)
             ->assertSee('<meta property="og:type" content="article"', false);
     }

@@ -29,9 +29,35 @@
         <x-inertia::head>
             <title>{{ config('app.name', 'Laravel') }}</title>
         </x-inertia::head>
-        @if (($page['component'] ?? null) === 'Welcome' && isset($page['props']['seo']))
+        @php
+            $component = $page['component'] ?? '';
+            $seo = $page['props']['seo'] ?? null;
+        @endphp
+        @if ($seo)
+            <title>{{ $seo['fullTitle'] }}</title>
+            <meta name="description" content="{{ $seo['description'] }}">
+            <meta name="robots" content="{{ $seo['robots'] }}">
+            <link rel="canonical" href="{{ $seo['canonical'] }}">
+            <meta property="og:type" content="{{ $component === 'Welcome' ? 'website' : 'article' }}">
+            <meta property="og:title" content="{{ $seo['fullTitle'] }}">
+            <meta property="og:description" content="{{ $seo['description'] }}">
+            <meta property="og:url" content="{{ $seo['canonical'] }}">
+            <meta property="og:image" content="{{ $seo['image'] }}">
+            <meta property="og:image:alt" content="{{ $seo['imageAlt'] }}">
+            <meta property="og:image:width" content="{{ $seo['imageWidth'] }}">
+            <meta property="og:image:height" content="{{ $seo['imageHeight'] }}">
+            <meta property="og:site_name" content="{{ $seo['siteName'] }}">
+            <meta property="og:locale" content="{{ $seo['locale'] }}">
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{{ $seo['fullTitle'] }}">
+            <meta name="twitter:description" content="{{ $seo['description'] }}">
+            <meta name="twitter:image" content="{{ $seo['image'] }}">
+            <meta name="twitter:image:alt" content="{{ $seo['imageAlt'] }}">
+        @elseif (\Illuminate\Support\Str::startsWith($component, 'auth/'))
+            <meta name="robots" content="noindex,follow">
+        @endif
+        @if ($component === 'Welcome' && $seo)
             @php
-                $seo = $page['props']['seo'];
                 $structuredData = [
                     '@context' => 'https://schema.org',
                     '@graph' => [

@@ -25,8 +25,8 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Str;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -74,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
 
     protected function ensureProductionAppUrlIsPublic(): void
     {
-        if (! app()->isProduction()) {
+        if (! app()->isProduction() && config('app.env') !== 'production') {
             return;
         }
 

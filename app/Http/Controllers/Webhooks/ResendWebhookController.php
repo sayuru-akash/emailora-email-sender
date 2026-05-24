@@ -25,8 +25,8 @@ class ResendWebhookController extends Controller
         ProcessEmailWebhookEvent::dispatch($event)->onQueue('email');
         $activity->log('webhook.accepted', 'Resend webhook event accepted.', null, [
             'provider' => 'resend',
-            'event_type' => $event['event_type'] ?? $event['type'] ?? null,
-            'message_id' => $event['provider_message_id'] ?? $event['message_id'] ?? null,
+            'event_type' => $event->eventType,
+            'message_id' => $event->providerMessageId,
         ], 'webhooks');
 
         return response()->json(['ok' => true]);

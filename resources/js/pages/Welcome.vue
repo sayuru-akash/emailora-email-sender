@@ -29,7 +29,7 @@ type SeoMeta = {
     locale: string;
 };
 
-const props = defineProps<{
+defineProps<{
     seo: SeoMeta;
 }>();
 
@@ -69,7 +69,6 @@ const trustItems = [
     'Unresolved personalization variables are blocked before delivery.',
     'Provider keys stay in environment configuration, not database records.',
 ];
-
 </script>
 
 <template>

@@ -2,7 +2,7 @@
 
 namespace App\Services\Email;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 final readonly class EmailWebhookEvent
 {
@@ -13,7 +13,7 @@ final readonly class EmailWebhookEvent
         public ?string $providerMessageId,
         public ?string $email,
         public array $payload,
-        public ?Carbon $occurredAt = null,
+        public ?CarbonInterface $occurredAt = null,
         public array $tags = [],
     ) {}
 }

@@ -370,6 +370,59 @@ class CampaignLifecycleTest extends TestCase
             ->assertSessionHas('error', 'Only completed or failed campaigns can resend failed recipients.');
     }
 
+    public function test_single_recipient_retry_requires_recipient_to_belong_to_campaign(): void
+    {
+        Queue::fake();
+        $campaign = EmailCampaign::factory()->create(['status' => 'completed']);
+        $otherCampaign = EmailCampaign::factory()->create(['status' => 'completed']);
+        $recipient = CampaignRecipient::query()->create([
+            'email_campaign_id' => $otherCampaign->id,
+            'email_normalized' => 'failed@example.com',
+            'status' => 'failed',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.recipients.resend', [$campaign, $recipient]))
+            ->assertNotFound();
+
+        Queue::assertNotPushed(SendSingleEmail::class);
+    }
+
+    public function test_single_recipient_retry_only_requeues_failed_recipients_on_terminal_campaigns(): void
+    {
+        Queue::fake();
+        $campaign = EmailCampaign::factory()->create(['status' => 'sending']);
+        $recipient = CampaignRecipient::query()->create([
+            'email_campaign_id' => $campaign->id,
+            'email_normalized' => 'failed@example.com',
+            'status' => 'failed',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.recipients.resend', [$campaign, $recipient]))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only completed or failed campaigns can retry failed recipients.');
+
+        $campaign->update(['status' => 'completed']);
+        $recipient->update(['status' => 'sent']);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.recipients.resend', [$campaign, $recipient]))
+            ->assertRedirect()
+            ->assertSessionHas('error', 'Only failed recipients can be retried.');
+
+        $recipient->update(['status' => 'failed', 'error_message' => 'Provider rejected']);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.recipients.resend', [$campaign, $recipient]))
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Recipient retry queued.');
+
+        $this->assertSame('queued', $recipient->refresh()->status);
+        $this->assertNull($recipient->error_message);
+        Queue::assertPushed(SendSingleEmail::class, fn (SendSingleEmail $job): bool => $job->recipientId === $recipient->id);
+    }
+
     public function test_due_scheduled_campaigns_are_queued_by_command(): void
     {
         Queue::fake();

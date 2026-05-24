@@ -25,8 +25,8 @@ class BrevoWebhookController extends Controller
         ProcessEmailWebhookEvent::dispatch($event)->onQueue('email');
         $activity->log('webhook.accepted', 'Brevo webhook event accepted.', null, [
             'provider' => 'brevo',
-            'event_type' => $event['event_type'] ?? $event['type'] ?? null,
-            'message_id' => $event['provider_message_id'] ?? $event['message_id'] ?? null,
+            'event_type' => $event->eventType,
+            'message_id' => $event->providerMessageId,
         ], 'webhooks');
 
         return response()->json(['ok' => true]);
