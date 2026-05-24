@@ -50,6 +50,9 @@ defineProps<{
                         href="/privacy"
                         >Privacy</Link
                     >
+                    <Link class="transition hover:text-foreground" href="/terms"
+                        >Terms</Link
+                    >
                 </nav>
 
                 <div class="flex items-center gap-2">

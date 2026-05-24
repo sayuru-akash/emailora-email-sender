@@ -2,6 +2,24 @@
 import { Head } from '@inertiajs/vue3';
 import PublicLayout from '@/layouts/public/PublicLayout.vue';
 
+type SeoMeta = {
+    title: string;
+    fullTitle: string;
+    description: string;
+    canonical: string;
+    image: string;
+    imageAlt: string;
+    imageWidth: number;
+    imageHeight: number;
+    siteName: string;
+    robots: string;
+    locale: string;
+};
+
+defineProps<{
+    seo: SeoMeta;
+}>();
+
 const sections = [
     {
         title: 'Data Emailora processes',
@@ -40,12 +58,25 @@ const sections = [
 
 <template>
     <Head>
-        <title>Privacy Policy</title>
-        <meta
-            name="description"
-            content="How Emailora handles contact records, campaign activity, provider events, imports, user accounts, and operational logs."
-        />
-        <link rel="canonical" href="/privacy" />
+        <title>{{ seo.title }}</title>
+        <meta name="description" :content="seo.description" />
+        <meta name="robots" :content="seo.robots" />
+        <link rel="canonical" :href="seo.canonical" />
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" :content="seo.siteName" />
+        <meta property="og:locale" :content="seo.locale" />
+        <meta property="og:title" :content="seo.fullTitle" />
+        <meta property="og:description" :content="seo.description" />
+        <meta property="og:url" :content="seo.canonical" />
+        <meta property="og:image" :content="seo.image" />
+        <meta property="og:image:alt" :content="seo.imageAlt" />
+        <meta property="og:image:width" :content="String(seo.imageWidth)" />
+        <meta property="og:image:height" :content="String(seo.imageHeight)" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" :content="seo.fullTitle" />
+        <meta name="twitter:description" :content="seo.description" />
+        <meta name="twitter:image" :content="seo.image" />
+        <meta name="twitter:image:alt" :content="seo.imageAlt" />
     </Head>
 
     <PublicLayout contained>

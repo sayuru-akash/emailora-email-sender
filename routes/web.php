@@ -11,17 +11,39 @@ use App\Http\Controllers\ListController;
 use App\Http\Controllers\PublicPageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedSegmentController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Webhooks\BrevoWebhookController;
 use App\Http\Controllers\Webhooks\ResendWebhookController;
+use App\Http\Middleware\HandleAppearance;
+use App\Http\Middleware\HandleInertiaRequests;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [PublicPageController::class, 'home'])->name('home');
 Route::get('/privacy', [PublicPageController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [PublicPageController::class, 'terms'])->name('terms');
+Route::withoutMiddleware([
+    EncryptCookies::class,
+    AddQueuedCookiesToResponse::class,
+    StartSession::class,
+    ShareErrorsFromSession::class,
+    PreventRequestForgery::class,
+    HandleAppearance::class,
+    HandleInertiaRequests::class,
+    AddLinkHeadersForPreloadedAssets::class,
+])->group(function () {
+    Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+    Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('seo.sitemap');
+});
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/global-search', GlobalSearchController::class)->name('global-search');

@@ -17,6 +17,10 @@ defineProps<Props>();
             $props.class,
         ]"
     >
-        <AppLogoIcon :class="['text-primary-foreground', iconClass]" />
+        <AppLogoIcon
+            :class="['text-primary-foreground', iconClass]"
+            aria-hidden="true"
+            focusable="false"
+        />
     </div>
 </template>

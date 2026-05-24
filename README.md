@@ -2,7 +2,7 @@
 
 Emailora is a Laravel + Inertia + Vue email contact management and campaign operations console.
 
-The public surface includes a lightweight homepage at `/`, plus `/privacy` and `/terms`. The authenticated workspace remains at `/dashboard`.
+The public surface includes a lightweight SEO-ready homepage at `/`, plus `/privacy`, `/terms`, `/robots.txt`, and `/sitemap.xml`. The authenticated workspace remains at `/dashboard`.
 
 ## Stack
 
@@ -70,7 +70,13 @@ BREVO_WEBHOOK_SECRET=
 
 Provider keys are read from environment variables only. `BREVO_API_KEY` is canonical; `BREVO_SMTP_API_KEY` is accepted as a backwards-compatible alias for older local `.env` files. The UI reports missing provider configuration as a failure; it does not fake successful sends.
 
-For production set `APP_ENV=production`, `APP_DEBUG=false`, a real `APP_URL`, secure session/cookie settings for your domain, and a production database. Keep `.env` out of git; `.env.example` is the only env file that should be committed.
+For production set `APP_ENV=production`, `APP_DEBUG=false`, a real public `APP_URL`, secure session/cookie settings for your domain, and a production database. Emailora will fail production boot if `APP_URL` points to localhost because canonical URLs, Open Graph images, robots, and sitemap output depend on it. Keep `.env` out of git; `.env.example` is the only env file that should be committed.
+
+## Public SEO Surface
+
+Public pages render server-visible titles, descriptions, absolute canonical URLs, `index,follow` robots metadata, Open Graph/Twitter card metadata, and homepage JSON-LD for the Emailora web application and Codezela Technologies publisher. The social preview image is stored at `/images/og/emailora.png` with the editable SVG source beside it.
+
+`/robots.txt` and `/sitemap.xml` are dynamic, stateless routes. They do not start a session or set cookies, and they use `APP_URL` for absolute sitemap and canonical URLs. Authenticated workspace routes are disallowed in robots and excluded from the sitemap.
 
 ## Queues And Recovery
 
@@ -149,6 +155,8 @@ php artisan config:cache
 php artisan view:cache
 php artisan optimize:clear
 ```
+
+Before deploying production assets, ensure `public/hot` is not present, `npm run build` has been run, and `APP_URL` is the final public origin.
 
 ## Production Notes
 

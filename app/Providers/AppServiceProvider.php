@@ -25,6 +25,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -54,6 +55,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Date::use(CarbonImmutable::class);
 
+        $this->ensureProductionAppUrlIsPublic();
+
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );
@@ -67,6 +70,19 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    protected function ensureProductionAppUrlIsPublic(): void
+    {
+        if (! app()->isProduction()) {
+            return;
+        }
+
+        $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        if (! $host || in_array($host, ['localhost', '127.0.0.1', '::1'], true) || Str::endsWith($host, '.localhost')) {
+            throw new \RuntimeException('APP_URL must be a public production URL when APP_ENV=production.');
+        }
     }
 
     protected function configureActivityLogging(): void

@@ -29,6 +29,41 @@
         <x-inertia::head>
             <title>{{ config('app.name', 'Laravel') }}</title>
         </x-inertia::head>
+        @if (($page['component'] ?? null) === 'Welcome' && isset($page['props']['seo']))
+            @php
+                $seo = $page['props']['seo'];
+                $structuredData = [
+                    '@context' => 'https://schema.org',
+                    '@graph' => [
+                        [
+                            '@type' => 'Organization',
+                            '@id' => $seo['canonical'].'#organization',
+                            'name' => 'Codezela Technologies',
+                            'url' => $seo['canonical'],
+                            'brand' => [
+                                '@type' => 'Brand',
+                                'name' => 'Emailora',
+                            ],
+                            'logo' => $seo['image'],
+                        ],
+                        [
+                            '@type' => 'WebApplication',
+                            '@id' => $seo['canonical'].'#application',
+                            'name' => 'Emailora',
+                            'applicationCategory' => 'BusinessApplication',
+                            'operatingSystem' => 'Web',
+                            'url' => $seo['canonical'],
+                            'image' => $seo['image'],
+                            'description' => $seo['description'],
+                            'publisher' => [
+                                '@id' => $seo['canonical'].'#organization',
+                            ],
+                        ],
+                    ],
+                ];
+            @endphp
+            <script type="application/ld+json">@json($structuredData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)</script>
+        @endif
     </head>
     <body class="font-sans antialiased">
         <x-inertia::app />

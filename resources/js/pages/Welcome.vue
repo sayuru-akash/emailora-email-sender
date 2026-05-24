@@ -15,6 +15,24 @@ import {
 } from 'lucide-vue-next';
 import PublicLayout from '@/layouts/public/PublicLayout.vue';
 
+type SeoMeta = {
+    title: string;
+    fullTitle: string;
+    description: string;
+    canonical: string;
+    image: string;
+    imageAlt: string;
+    imageWidth: number;
+    imageHeight: number;
+    siteName: string;
+    robots: string;
+    locale: string;
+};
+
+const props = defineProps<{
+    seo: SeoMeta;
+}>();
+
 const capabilities = [
     {
         title: 'Clean contact records',
@@ -51,16 +69,30 @@ const trustItems = [
     'Unresolved personalization variables are blocked before delivery.',
     'Provider keys stay in environment configuration, not database records.',
 ];
+
 </script>
 
 <template>
     <Head>
-        <title>Emailora</title>
-        <meta
-            name="description"
-            content="Emailora is a clean email campaign operations console for contacts, imports, templates, queued sends, provider events, reporting, and audit logs."
-        />
-        <link rel="canonical" href="/" />
+        <title>{{ seo.title }}</title>
+        <meta name="description" :content="seo.description" />
+        <meta name="robots" :content="seo.robots" />
+        <link rel="canonical" :href="seo.canonical" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" :content="seo.siteName" />
+        <meta property="og:locale" :content="seo.locale" />
+        <meta property="og:title" :content="seo.fullTitle" />
+        <meta property="og:description" :content="seo.description" />
+        <meta property="og:url" :content="seo.canonical" />
+        <meta property="og:image" :content="seo.image" />
+        <meta property="og:image:alt" :content="seo.imageAlt" />
+        <meta property="og:image:width" :content="String(seo.imageWidth)" />
+        <meta property="og:image:height" :content="String(seo.imageHeight)" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" :content="seo.fullTitle" />
+        <meta name="twitter:description" :content="seo.description" />
+        <meta name="twitter:image" :content="seo.image" />
+        <meta name="twitter:image:alt" :content="seo.imageAlt" />
     </Head>
 
     <PublicLayout>
@@ -88,7 +120,11 @@ const trustItems = [
                         href="/login"
                     >
                         Log in
-                        <ArrowRight class="size-4" />
+                        <ArrowRight
+                            class="size-4"
+                            aria-hidden="true"
+                            focusable="false"
+                        />
                     </Link>
                     <a
                         class="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-5 text-sm font-medium transition hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -180,7 +216,11 @@ const trustItems = [
                                 <div
                                     class="mb-3 flex items-center gap-2 text-sm font-medium"
                                 >
-                                    <Tags class="size-4 text-primary" />
+                                    <Tags
+                                        class="size-4 text-primary"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                    />
                                     Audience
                                 </div>
                                 <div class="space-y-2 text-xs">
@@ -202,7 +242,11 @@ const trustItems = [
                                 <div
                                     class="mb-3 flex items-center gap-2 text-sm font-medium"
                                 >
-                                    <MailCheck class="size-4 text-primary" />
+                                    <MailCheck
+                                        class="size-4 text-primary"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                    />
                                     Provider
                                 </div>
                                 <div class="space-y-2 text-xs">
@@ -211,13 +255,19 @@ const trustItems = [
                                     >
                                         <CheckCircle2
                                             class="size-3.5 text-emerald-600"
+                                            aria-hidden="true"
+                                            focusable="false"
                                         />
                                         Brevo accepted
                                     </div>
                                     <div
                                         class="flex items-center gap-2 rounded-md bg-muted px-3 py-2"
                                     >
-                                        <Clock3 class="size-3.5 text-primary" />
+                                        <Clock3
+                                            class="size-3.5 text-primary"
+                                            aria-hidden="true"
+                                            focusable="false"
+                                        />
                                         Queue monitored
                                     </div>
                                 </div>
@@ -265,7 +315,12 @@ const trustItems = [
                     :key="item.title"
                     class="rounded-lg border border-border bg-card p-5 transition hover:bg-muted/30"
                 >
-                    <component :is="item.icon" class="size-5 text-primary" />
+                    <component
+                        :is="item.icon"
+                        class="size-5 text-primary"
+                        aria-hidden="true"
+                        focusable="false"
+                    />
                     <h3 class="mt-5 text-base font-semibold">
                         {{ item.title }}
                     </h3>
@@ -281,7 +336,11 @@ const trustItems = [
                 class="mx-auto grid w-full max-w-7xl gap-10 px-4 py-16 lg:grid-cols-[0.8fr_1fr] lg:px-8"
             >
                 <div>
-                    <ShieldCheck class="size-8 text-primary" />
+                    <ShieldCheck
+                        class="size-8 text-primary"
+                        aria-hidden="true"
+                        focusable="false"
+                    />
                     <h2 class="mt-5 text-3xl font-semibold tracking-tight">
                         Consent and recovery are part of the workflow.
                     </h2>
@@ -298,6 +357,8 @@ const trustItems = [
                     >
                         <CheckCircle2
                             class="mt-0.5 size-4 shrink-0 text-emerald-600"
+                            aria-hidden="true"
+                            focusable="false"
                         />
                         <span>{{ item }}</span>
                     </div>
@@ -310,7 +371,11 @@ const trustItems = [
                 class="rounded-lg border border-border bg-card p-6 sm:p-8 lg:flex lg:items-center lg:justify-between"
             >
                 <div class="max-w-2xl">
-                    <DatabaseZap class="size-6 text-primary" />
+                    <DatabaseZap
+                        class="size-6 text-primary"
+                        aria-hidden="true"
+                        focusable="false"
+                    />
                     <h2 class="mt-5 text-3xl font-semibold tracking-tight">
                         Bring campaign work back under control.
                     </h2>
@@ -325,7 +390,11 @@ const trustItems = [
                     href="/login"
                 >
                     Log in to Emailora
-                    <ArrowRight class="size-4" />
+                    <ArrowRight
+                        class="size-4"
+                        aria-hidden="true"
+                        focusable="false"
+                    />
                 </Link>
             </div>
         </section>

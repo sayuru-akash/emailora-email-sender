@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { Moon, Sun } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAppearance } from '@/composables/useAppearance';
 
 const { resolvedAppearance, updateAppearance } = useAppearance();
+const mounted = ref(false);
 
 const isDark = computed(() => resolvedAppearance.value === 'dark');
 const nextLabel = computed(() =>
-    isDark.value ? 'Switch to light mode' : 'Switch to dark mode',
+    !mounted.value
+        ? 'Toggle theme'
+        : isDark.value
+          ? 'Switch to light mode'
+          : 'Switch to dark mode',
 );
+
+onMounted(() => {
+    mounted.value = true;
+});
 
 function toggleTheme() {
     updateAppearance(isDark.value ? 'light' : 'dark');
@@ -23,7 +32,12 @@ function toggleTheme() {
         :title="nextLabel"
         @click="toggleTheme"
     >
-        <Sun v-if="isDark" class="size-4" />
-        <Moon v-else class="size-4" />
+        <Sun
+            v-if="mounted && isDark"
+            class="size-4"
+            aria-hidden="true"
+            focusable="false"
+        />
+        <Moon v-else class="size-4" aria-hidden="true" focusable="false" />
     </button>
 </template>
