@@ -46,6 +46,21 @@ class ContactImportFileTest extends TestCase
         $this->assertSame('Codezela', $parsed['rows'][0]['company']);
     }
 
+    public function test_xlsx_parser_rejects_xml_doctype_declarations(): void
+    {
+        $files = app(ContactImportFile::class);
+        Storage::fake('local');
+        Storage::put('imports/entity.xlsx', $this->xlsxWithSheet(
+            '<!DOCTYPE worksheet [<!ENTITY xxe "blocked">]>'.
+            '<row r="1"><c r="A1" t="inlineStr"><is><t>email</t></is></c></row>'
+        ));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('unsupported XML declarations');
+
+        $files->parse(Storage::path('imports/entity.xlsx'), 'xlsx');
+    }
+
     public function test_analysis_reports_valid_invalid_duplicate_rows_and_metadata(): void
     {
         Storage::fake('local');

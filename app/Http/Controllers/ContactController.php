@@ -9,6 +9,7 @@ use App\Models\EmailMessage;
 use App\Models\ListModel;
 use App\Models\Tag;
 use App\Services\Activity\ActivityLogger;
+use App\Support\SafeCsv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -154,8 +155,8 @@ class ContactController extends Controller
     {
         return response()->streamDownload(function (): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['email', 'name', 'status', 'source', 'created_at']);
-            Contact::orderBy('id')->cursor()->each(fn (Contact $contact) => fputcsv($out, [
+            SafeCsv::writeRow($out, ['email', 'name', 'status', 'source', 'created_at']);
+            Contact::orderBy('id')->cursor()->each(fn (Contact $contact) => SafeCsv::writeRow($out, [
                 $contact->email,
                 $contact->display_name,
                 $contact->status,

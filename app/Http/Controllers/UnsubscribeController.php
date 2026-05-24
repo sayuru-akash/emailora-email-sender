@@ -13,7 +13,10 @@ class UnsubscribeController extends Controller
 {
     public function show(string $signedToken): Response
     {
-        return Inertia::render('Unsubscribe/Show', ['token' => $signedToken]);
+        return Inertia::render('Unsubscribe/Show', [
+            'token' => $signedToken,
+            'storeUrl' => URL::signedRoute('unsubscribe.store', ['signedToken' => $signedToken]),
+        ]);
     }
 
     public function store(string $signedToken): RedirectResponse

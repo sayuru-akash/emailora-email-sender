@@ -42,7 +42,12 @@ final class BrevoProvider implements EmailProviderInterface
             $data['tags'] = collect($payload->tags)->map(fn ($value, $name) => "{$name}:{$value}")->values()->all();
         }
 
-        $response = Http::timeout(config('emailora.timeout'))->withHeaders(['api-key' => $apiKey])->post('https://api.brevo.com/v3/smtp/email', $data);
+        $headers = ['api-key' => $apiKey];
+        if ($payload->idempotencyKey) {
+            $headers['idempotencyKey'] = $payload->idempotencyKey;
+        }
+
+        $response = Http::timeout(config('emailora.timeout'))->withHeaders($headers)->post('https://api.brevo.com/v3/smtp/email', $data);
 
         if (! $response->successful()) {
             return EmailResult::failed('Brevo rejected the email.', $response->status() === 429 ? 'rate_limited' : 'provider_rejected', $response->json() ?? []);

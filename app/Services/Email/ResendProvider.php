@@ -16,7 +16,12 @@ final class ResendProvider implements EmailProviderInterface
             return EmailResult::failed('Resend API key is not configured.', 'configuration');
         }
 
-        $response = Http::timeout(config('emailora.timeout'))->withToken($apiKey)->post('https://api.resend.com/emails', [
+        $request = Http::timeout(config('emailora.timeout'))->withToken($apiKey);
+        if ($payload->idempotencyKey) {
+            $request = $request->withHeaders(['Idempotency-Key' => $payload->idempotencyKey]);
+        }
+
+        $response = $request->post('https://api.resend.com/emails', [
             'from' => "{$payload->fromName} <{$payload->fromEmail}>",
             'to' => [$payload->to],
             'reply_to' => $payload->replyTo,

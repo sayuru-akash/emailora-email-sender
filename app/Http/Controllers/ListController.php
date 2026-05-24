@@ -7,6 +7,7 @@ use App\Http\Requests\ListRequest;
 use App\Models\Contact;
 use App\Models\ListModel;
 use App\Services\Activity\ActivityLogger;
+use App\Support\SafeCsv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -115,8 +116,8 @@ class ListController extends Controller
     {
         return response()->streamDownload(function () use ($list): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['email', 'name', 'status']);
-            $list->contacts()->cursor()->each(fn (Contact $contact) => fputcsv($out, [$contact->email, $contact->display_name, $contact->status]));
+            SafeCsv::writeRow($out, ['email', 'name', 'status']);
+            $list->contacts()->cursor()->each(fn (Contact $contact) => SafeCsv::writeRow($out, [$contact->email, $contact->display_name, $contact->status]));
         }, Str::slug($list->name).'-contacts.csv');
     }
 }

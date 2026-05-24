@@ -72,8 +72,7 @@ class UserManagementTest extends TestCase
                 'password' => '',
                 'password_confirmation' => '',
             ])
-            ->assertRedirect()
-            ->assertSessionHas('error', 'Admins cannot edit owner or admin users.');
+            ->assertSessionHasErrors('role');
 
         $this->actingAs($admin)
             ->delete(route('users.destroy', $owner))
@@ -81,6 +80,36 @@ class UserManagementTest extends TestCase
             ->assertSessionHas('error', 'Admins cannot delete owner or admin users.');
 
         $this->assertNotNull($owner->fresh());
+    }
+
+    public function test_admin_cannot_create_or_promote_privileged_users(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $staff = User::factory()->create(['role' => 'staff']);
+
+        $this->actingAs($admin)
+            ->post(route('users.store'), [
+                'name' => 'New Owner',
+                'email' => 'new-owner@example.com',
+                'role' => 'owner',
+                'status' => 'active',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+            ])
+            ->assertSessionHasErrors('role');
+
+        $this->actingAs($admin)
+            ->put(route('users.update', $staff), [
+                'name' => $staff->name,
+                'email' => $staff->email,
+                'role' => 'admin',
+                'status' => 'active',
+                'password' => '',
+                'password_confirmation' => '',
+            ])
+            ->assertSessionHasErrors('role');
+
+        $this->assertSame('staff', $staff->refresh()->role);
     }
 
     public function test_user_cannot_delete_self(): void

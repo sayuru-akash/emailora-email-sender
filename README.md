@@ -385,6 +385,8 @@ Webhook endpoints:
 
 Webhook controllers validate signatures, dispatch sanitized `EmailWebhookEvent` objects to the `email` queue, and keep duplicate provider events idempotent.
 
+Campaign send jobs attach stable provider idempotency headers per campaign recipient: `Idempotency-Key` for Resend and `idempotencyKey` for Brevo. This reduces duplicate-delivery risk if a queue worker retries after a provider accepted a message but before local persistence completed.
+
 ## Imports
 
 Import flow:

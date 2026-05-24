@@ -16,4 +16,23 @@ final readonly class EmailWebhookEvent
         public ?CarbonInterface $occurredAt = null,
         public array $tags = [],
     ) {}
+
+    public function dedupeKey(): string
+    {
+        return $this->providerEventId ?: hash('sha256', implode('|', [
+            $this->provider,
+            $this->eventType,
+            $this->providerMessageId ?? '',
+            $this->email ?? '',
+        ]));
+    }
+
+    public function sanitizedPayload(): array
+    {
+        return [
+            'provider' => $this->provider,
+            'event_type' => $this->eventType,
+            'tags' => $this->tags,
+        ];
+    }
 }

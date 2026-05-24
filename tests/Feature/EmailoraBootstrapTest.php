@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
 use Tests\TestCase;
 
 class EmailoraBootstrapTest extends TestCase
@@ -27,5 +29,25 @@ class EmailoraBootstrapTest extends TestCase
     public function test_public_registration_is_disabled(): void
     {
         $this->get('/register')->assertNotFound();
+    }
+
+    public function test_production_seeder_rejects_default_owner_password(): void
+    {
+        $originalEnvironment = app()->environment();
+        app()->detectEnvironment(fn () => 'production');
+        putenv('OWNER_PASSWORD=password');
+        $_ENV['OWNER_PASSWORD'] = 'password';
+        $_SERVER['OWNER_PASSWORD'] = 'password';
+
+        try {
+            (new DatabaseSeeder)->run();
+            $this->fail('Production seeder accepted the default owner password.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Set a non-default OWNER_PASSWORD', $exception->getMessage());
+        } finally {
+            putenv('OWNER_PASSWORD');
+            unset($_ENV['OWNER_PASSWORD'], $_SERVER['OWNER_PASSWORD']);
+            app()->detectEnvironment(fn () => $originalEnvironment);
+        }
     }
 }

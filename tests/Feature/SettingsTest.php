@@ -42,9 +42,19 @@ class SettingsTest extends TestCase
         $this->assertSame('brevo', SystemSetting::where('key', 'default_provider')->firstOrFail()->value);
     }
 
-    public function test_staff_cannot_update_settings_or_send_test_email(): void
+    public function test_staff_cannot_view_update_settings_or_send_test_email(): void
     {
         $staff = User::factory()->create(['role' => 'staff']);
+
+        SystemSetting::query()->create([
+            'key' => 'resend_api_key',
+            'group' => 'email',
+            'value' => 'secret-value',
+        ]);
+
+        $this->actingAs($staff)
+            ->get(route('settings.index'))
+            ->assertForbidden();
 
         $this->actingAs($staff)
             ->put(route('settings.update'), [

@@ -12,6 +12,12 @@ use ZipArchive;
 
 class ContactImportFile
 {
+    private const MAX_IMPORT_ROWS = 20000;
+
+    private const MAX_IMPORT_COLUMNS = 100;
+
+    private const MAX_XLSX_XML_BYTES = 25000000;
+
     public const SAMPLE_HEADERS = [
         'email',
         'full_name',
@@ -228,6 +234,18 @@ class ContactImportFile
         $rows = [];
 
         while (($row = fgetcsv($handle)) !== false) {
+            if (count($rows) >= self::MAX_IMPORT_ROWS) {
+                fclose($handle);
+
+                throw new RuntimeException('Import files may not contain more than '.self::MAX_IMPORT_ROWS.' rows.');
+            }
+
+            if (count($row) > self::MAX_IMPORT_COLUMNS) {
+                fclose($handle);
+
+                throw new RuntimeException('Import files may not contain more than '.self::MAX_IMPORT_COLUMNS.' columns.');
+            }
+
             $rows[] = $this->combineRow($headers, $row);
         }
 
@@ -244,22 +262,30 @@ class ContactImportFile
         }
 
         $sharedStrings = $this->sharedStrings($zip);
-        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $sheet = $this->safeZipXml($zip, 'xl/worksheets/sheet1.xml');
         $zip->close();
 
         if (! $sheet) {
             throw new RuntimeException('XLSX file does not contain a first worksheet.');
         }
 
-        $xml = simplexml_load_string($sheet);
+        $xml = $this->safeXml($sheet, 'XLSX worksheet');
         if (! $xml instanceof SimpleXMLElement) {
             throw new RuntimeException('Could not read XLSX worksheet.');
         }
 
         $table = [];
         foreach ($xml->sheetData->row as $row) {
+            if (count($table) > self::MAX_IMPORT_ROWS) {
+                throw new RuntimeException('Import files may not contain more than '.self::MAX_IMPORT_ROWS.' rows.');
+            }
+
             $cells = [];
             foreach ($row->c as $cell) {
+                if (count($cells) >= self::MAX_IMPORT_COLUMNS) {
+                    throw new RuntimeException('Import files may not contain more than '.self::MAX_IMPORT_COLUMNS.' columns.');
+                }
+
                 $reference = (string) $cell['r'];
                 $index = $this->columnIndex($reference);
                 $type = (string) $cell['t'];
@@ -296,7 +322,12 @@ class ContactImportFile
         }
 
         $expanded = [];
-        for ($index = 0; $index <= max(array_keys($row)); $index++) {
+        $max = max(array_keys($row));
+        if ($max >= self::MAX_IMPORT_COLUMNS) {
+            throw new RuntimeException('Import files may not contain more than '.self::MAX_IMPORT_COLUMNS.' columns.');
+        }
+
+        for ($index = 0; $index <= $max; $index++) {
             $expanded[] = $row[$index] ?? null;
         }
 
@@ -343,12 +374,12 @@ class ContactImportFile
 
     private function sharedStrings(ZipArchive $zip): array
     {
-        $xml = $zip->getFromName('xl/sharedStrings.xml');
+        $xml = $this->safeZipXml($zip, 'xl/sharedStrings.xml', false);
         if (! $xml) {
             return [];
         }
 
-        $strings = simplexml_load_string($xml);
+        $strings = $this->safeXml($xml, 'XLSX shared strings');
         if (! $strings instanceof SimpleXMLElement) {
             return [];
         }
@@ -365,6 +396,46 @@ class ContactImportFile
         }
 
         return $index - 1;
+    }
+
+    private function safeZipXml(ZipArchive $zip, string $name, bool $required = true): string
+    {
+        $stat = $zip->statName($name);
+        if ($stat === false) {
+            if ($required) {
+                throw new RuntimeException('XLSX file is missing '.$name.'.');
+            }
+
+            return '';
+        }
+
+        if (($stat['size'] ?? 0) > self::MAX_XLSX_XML_BYTES) {
+            throw new RuntimeException('XLSX XML parts are too large to import safely.');
+        }
+
+        $xml = $zip->getFromName($name);
+        if ($xml === false) {
+            if ($required) {
+                throw new RuntimeException('Could not read '.$name.'.');
+            }
+
+            return '';
+        }
+
+        if (strlen($xml) > self::MAX_XLSX_XML_BYTES) {
+            throw new RuntimeException('XLSX XML parts are too large to import safely.');
+        }
+
+        return $xml;
+    }
+
+    private function safeXml(string $xml, string $label): SimpleXMLElement|false
+    {
+        if (preg_match('/<!\s*(DOCTYPE|ENTITY)\b/i', $xml) === 1) {
+            throw new RuntimeException($label.' contains unsupported XML declarations.');
+        }
+
+        return simplexml_load_string($xml, SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
     }
 
     private function sheetXml(array $rows): string

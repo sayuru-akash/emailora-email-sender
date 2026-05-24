@@ -104,16 +104,20 @@ class ContactsTest extends TestCase
     {
         Contact::factory()->create([
             'email' => 'export@example.com',
-            'full_name' => 'Export Contact',
+            'full_name' => '=HYPERLINK("https://example.test")',
             'status' => 'active',
-            'source' => 'manual',
+            'source' => '@manual',
         ]);
 
-        $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->create())
             ->get(route('contacts.export'))
             ->assertOk()
             ->assertStreamed()
             ->assertHeader('Content-Disposition', 'attachment; filename=contacts.csv');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString("'=HYPERLINK", $csv);
+        $this->assertStringContainsString("'@manual", $csv);
     }
 
     public function test_contact_update_allows_same_email_with_different_casing_but_rejects_another_contact_email(): void

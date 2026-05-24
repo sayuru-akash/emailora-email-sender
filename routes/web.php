@@ -94,14 +94,13 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/reports/campaigns/{campaign}', [ReportController::class, 'campaignReport'])->name('reports.campaign');
     Route::get('/reports/campaigns/{campaign}/export', [ReportController::class, 'exportCampaign'])->name('reports.campaign.export');
 
-    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
-    Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
-    Route::post('/settings/test-email', [SettingController::class, 'testEmail'])->name('settings.test-email');
-
     Route::post('/segments/{segment}/preview', [SavedSegmentController::class, 'preview'])->name('segments.preview');
     Route::resource('segments', SavedSegmentController::class);
 
     Route::middleware('role:owner,admin')->group(function () {
+        Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+        Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
+        Route::post('/settings/test-email', [SettingController::class, 'testEmail'])->name('settings.test-email');
         Route::get('/activity-logs/export', [ActivityLogController::class, 'export'])->name('activity-logs.export');
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
     });

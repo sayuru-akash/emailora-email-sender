@@ -33,4 +33,17 @@ class InactiveUserWorkspaceBoundaryTest extends TestCase
                 ->assertRedirect(route('login'));
         }
     }
+
+    public function test_inactive_users_cannot_access_fortify_two_factor_routes(): void
+    {
+        $inactive = User::factory()->create(['status' => 'inactive', 'email_verified_at' => now()]);
+
+        $this->actingAs($inactive)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get(route('two-factor.qr-code'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
 }

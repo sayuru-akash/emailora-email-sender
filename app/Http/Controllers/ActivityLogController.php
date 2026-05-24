@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\BuildsTableProps;
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Support\SafeCsv;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,10 +37,10 @@ class ActivityLogController extends Controller
     {
         return response()->streamDownload(function () use ($request): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['occurred_at', 'category', 'event', 'severity', 'user', 'subject_type', 'subject_id', 'subject_name', 'description', 'properties', 'ip_address']);
+            SafeCsv::writeRow($out, ['occurred_at', 'category', 'event', 'severity', 'user', 'subject_type', 'subject_id', 'subject_name', 'description', 'properties', 'ip_address']);
 
             $this->baseQuery($request)->cursor()->each(function (ActivityLog $log) use ($out): void {
-                fputcsv($out, [
+                SafeCsv::writeRow($out, [
                     optional($log->occurred_at)->toDateTimeString(),
                     $log->category,
                     $log->event,

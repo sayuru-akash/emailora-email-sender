@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-const props = defineProps<{ token: string }>();
+const props = defineProps<{ token: string; storeUrl: string }>();
 const page = usePage();
 </script>
 <template>
@@ -16,7 +16,7 @@ const page = usePage();
             </p>
             <button
                 class="mt-5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
-                @click="router.post(`/unsubscribe/${props.token}`)"
+                @click="router.post(props.storeUrl)"
             >
                 Confirm
             </button>

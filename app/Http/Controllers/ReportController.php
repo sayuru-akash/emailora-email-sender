@@ -6,6 +6,7 @@ use App\Models\Contact;
 use App\Models\EmailCampaign;
 use App\Models\EmailEvent;
 use App\Models\EmailMessage;
+use App\Support\SafeCsv;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -83,8 +84,8 @@ class ReportController extends Controller
     {
         return response()->streamDownload(function () use ($campaign): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['email', 'status', 'provider_message_id', 'error']);
-            $campaign->recipients()->cursor()->each(fn ($recipient) => fputcsv($out, [$recipient->email_normalized, $recipient->status, $recipient->provider_message_id, $recipient->error_message]));
+            SafeCsv::writeRow($out, ['email', 'status', 'provider_message_id', 'error']);
+            $campaign->recipients()->cursor()->each(fn ($recipient) => SafeCsv::writeRow($out, [$recipient->email_normalized, $recipient->status, $recipient->provider_message_id, $recipient->error_message]));
         }, 'campaign-report.csv');
     }
 

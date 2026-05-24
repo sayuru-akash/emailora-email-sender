@@ -62,7 +62,7 @@ class SendSingleEmail implements ShouldQueue
                     fromName: $campaign->from_name,
                     replyTo: $campaign->reply_to_email,
                     tags: ['campaign_id' => $campaign->id, 'recipient_id' => $recipient->id],
-                    idempotencyKey: "campaign:{$campaign->id}:recipient:{$recipient->id}:attempt:{$attempt}",
+                    idempotencyKey: "campaign:{$campaign->id}:recipient:{$recipient->id}",
                 ),
             ];
         });

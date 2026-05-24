@@ -6,6 +6,7 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,6 +15,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->isProduction() && env('OWNER_PASSWORD', 'password') === 'password') {
+            throw new RuntimeException('Set a non-default OWNER_PASSWORD before seeding production.');
+        }
+
         User::query()->updateOrCreate(
             ['email' => env('OWNER_EMAIL', 'owner@example.com')],
             [

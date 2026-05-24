@@ -18,9 +18,8 @@ class ProcessEmailWebhookEvent implements ShouldQueue
 
     public function handle(): void
     {
-        $existing = $this->event->providerEventId
-            ? EmailEvent::where('provider', $this->event->provider)->where('provider_event_id', $this->event->providerEventId)->first()
-            : null;
+        $eventId = $this->event->dedupeKey();
+        $existing = EmailEvent::where('provider', $this->event->provider)->where('provider_event_id', $eventId)->first();
 
         if ($existing?->processed_at) {
             return;
@@ -32,7 +31,7 @@ class ProcessEmailWebhookEvent implements ShouldQueue
 
         $record = $existing ?: EmailEvent::create([
             'provider' => $this->event->provider,
-            'provider_event_id' => $this->event->providerEventId,
+            'provider_event_id' => $eventId,
             'provider_message_id' => $this->event->providerMessageId,
             'event_type' => $this->event->eventType,
             'email_campaign_id' => $recipient?->email_campaign_id,
@@ -40,7 +39,7 @@ class ProcessEmailWebhookEvent implements ShouldQueue
             'email_message_id' => $message?->id,
             'contact_id' => $recipient?->contact_id,
             'email_normalized' => $recipient?->email_normalized ?: $this->event->email,
-            'payload' => $this->event->payload,
+            'payload' => $this->event->sanitizedPayload(),
             'occurred_at' => $this->event->occurredAt,
         ]);
 

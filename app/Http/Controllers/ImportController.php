@@ -11,6 +11,7 @@ use App\Models\ListModel;
 use App\Models\Tag;
 use App\Services\Activity\ActivityLogger;
 use App\Services\Imports\ContactImportFile;
+use App\Support\SafeCsv;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -215,8 +216,8 @@ class ImportController extends Controller
     {
         return response()->streamDownload(function () use ($import): void {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['row_number', 'error', 'raw_data']);
-            $import->rows()->where('status', 'failed')->cursor()->each(fn ($row) => fputcsv($out, [$row->row_number, $row->error_message, json_encode($row->raw_data)]));
+            SafeCsv::writeRow($out, ['row_number', 'error', 'raw_data']);
+            $import->rows()->where('status', 'failed')->cursor()->each(fn ($row) => SafeCsv::writeRow($out, [$row->row_number, $row->error_message, json_encode($row->raw_data)]));
         }, 'failed-import-rows.csv');
     }
 

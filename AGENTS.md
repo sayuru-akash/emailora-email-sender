@@ -62,7 +62,7 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Effective provider env keys are `EMAIL_PROVIDER`, `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`, `EMAIL_REPLY_TO`, `RESEND_API_KEY`, and `BREVO_API_KEY`; `BREVO_SMTP_API_KEY` is a backwards-compatible local alias only.
 - Do not echo provider secrets in chat or logs.
 - Brevo rejects empty optional fields such as an empty `headers` object; provider payloads should omit optional keys when empty.
-- `EmailPayload::$idempotencyKey` exists but is not yet wired to provider-specific idempotency headers. Treat retry/double-send risk seriously around provider sends.
+- `EmailPayload::$idempotencyKey` is wired to Resend `Idempotency-Key` and Brevo `idempotencyKey` headers. Treat retry/double-send risk seriously around provider sends and keep idempotency stable per campaign recipient.
 - Webhook controllers dispatch `EmailWebhookEvent` objects to the `email` queue and must log only sanitized provider, event type, and provider message id. Keep duplicate provider events idempotent.
 
 ## Verification

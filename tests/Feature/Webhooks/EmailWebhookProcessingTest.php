@@ -67,4 +67,26 @@ class EmailWebhookProcessingTest extends TestCase
 
         $this->assertSame(1, EmailEvent::where('provider', 'resend')->where('provider_event_id', 'evt_same')->count());
     }
+
+    public function test_duplicate_provider_event_without_event_id_is_idempotent_and_sanitized(): void
+    {
+        $payload = [
+            'headers' => ['authorization' => 'secret'],
+            'payload' => ['raw' => 'provider data'],
+            'email' => 'student@example.com',
+        ];
+
+        (new ProcessEmailWebhookEvent(new EmailWebhookEvent('resend', 'delivered', null, 'msg_same', 'student@example.com', $payload, tags: ['campaign_id' => 1])))->handle();
+        (new ProcessEmailWebhookEvent(new EmailWebhookEvent('resend', 'delivered', null, 'msg_same', 'student@example.com', $payload, tags: ['campaign_id' => 1])))->handle();
+
+        $event = EmailEvent::where('provider', 'resend')->firstOrFail();
+
+        $this->assertSame(1, EmailEvent::where('provider', 'resend')->count());
+        $this->assertNotNull($event->provider_event_id);
+        $this->assertSame([
+            'provider' => 'resend',
+            'event_type' => 'delivered',
+            'tags' => ['campaign_id' => 1],
+        ], $event->payload);
+    }
 }
