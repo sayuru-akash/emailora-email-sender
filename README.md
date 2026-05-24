@@ -23,7 +23,7 @@ npm run build
 composer dev
 ```
 
-`composer dev` starts the Laravel server at `http://127.0.0.1:8000`, Vite, logs, the scheduler loop, and a queue listener for `email`, `imports`, and `default`. Running only `php artisan serve` will show the UI, but queued campaign/import jobs will stay in the database until a matching worker is started.
+`composer dev` starts the Laravel server at `http://localhost:8000` / `http://127.0.0.1:8000`, Vite, logs, the scheduler loop, and a queue listener for `email`, `imports`, and `default`. Running only `php artisan serve` will show the UI, but queued campaign/import jobs will stay in the database until a matching worker is started.
 
 Default local owner:
 
@@ -88,7 +88,7 @@ php artisan emailora:campaigns:finalize-stuck
 
 The scheduler runs both commands on intervals. Production should run `php artisan schedule:run` every minute.
 
-For local development, prefer `composer dev`; it starts `php artisan serve --host=127.0.0.1 --port=8000`, `php artisan queue:listen --queue=email,imports,default ...`, and `php artisan schedule:work`. If you start processes manually, run all three pieces in separate terminals: the local server on port 8000, the queue worker above, and `php artisan schedule:work`.
+For local development, prefer `composer dev`; it starts `php artisan serve --host=127.0.0.1 --port=8000`, `php artisan queue:listen --queue=email,imports,default ...`, and `php artisan schedule:work`. If you start processes manually, run all three pieces in separate terminals: the local server on `localhost:8000`, the queue worker above, and `php artisan schedule:work`.
 
 ## Contact Imports
 

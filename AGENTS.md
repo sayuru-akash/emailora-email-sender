@@ -47,7 +47,7 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Scheduled campaigns are queued by `emailora:campaigns:queue-scheduled`.
 - Active/stuck campaigns are recovered by `emailora:campaigns:recover`.
 - Stale campaigns are finalized by `emailora:campaigns:finalize-stuck`.
-- Local `composer dev` must keep listening to `--queue=email,imports,default` and run `php artisan schedule:work`; `php artisan serve` alone is not enough for queued campaigns/imports.
+- Local `composer dev` must serve `http://localhost:8000` / `http://127.0.0.1:8000`, keep listening to `--queue=email,imports,default`, and run `php artisan schedule:work`; `php artisan serve` alone is not enough for queued campaigns/imports.
 - Production must run `php artisan schedule:run` every minute and a monitored queue worker with `--queue=email,imports,default --timeout=300`; `DB_QUEUE_RETRY_AFTER` must be greater than the timeout, for example `420`.
 - A queued/preparing campaign with no `campaign_recipients` yet should show its target audience count in the UI. The recover command should prepare recipients, not finalize it as empty.
 - `PrepareEmailCampaignRecipients` and `SendEmailCampaignMessages` are unique per campaign while pending/processing to avoid repeated recover runs piling up duplicate work.
