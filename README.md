@@ -20,8 +20,10 @@ cp .env.example .env
 php artisan key:generate
 php artisan migrate --seed
 npm run build
-php artisan serve
+composer dev
 ```
+
+`composer dev` starts the Laravel server at `http://127.0.0.1:8000`, Vite, logs, the scheduler loop, and a queue listener for `email`, `imports`, and `default`. Running only `php artisan serve` will show the UI, but queued campaign/import jobs will stay in the database until a matching worker is started.
 
 Default local owner:
 
@@ -71,10 +73,10 @@ For production set `APP_ENV=production`, `APP_DEBUG=false`, a real `APP_URL`, se
 Run a queue worker in every environment that sends campaigns or processes imports:
 
 ```bash
-php artisan queue:work --queue=email,imports,default --tries=3 --timeout=120 --sleep=1 --max-time=3600
+php artisan queue:work --queue=email,imports,default --tries=3 --timeout=300 --sleep=1 --max-time=3600
 ```
 
-If you tune queue env values, make sure `DB_QUEUE_RETRY_AFTER` is greater than the longest worker timeout. Production should run the worker under Supervisor, systemd, Forge, or another process monitor.
+Set `DB_QUEUE_RETRY_AFTER=420` or another value greater than the worker timeout so long import jobs are not retried while still running. Production should run the worker under Supervisor, systemd, Forge, or another process monitor, and should monitor `failed_jobs`.
 
 Campaign scheduler and recovery commands:
 
@@ -85,6 +87,31 @@ php artisan emailora:campaigns:finalize-stuck
 ```
 
 The scheduler runs both commands on intervals. Production should run `php artisan schedule:run` every minute.
+
+For local development, prefer `composer dev`; it starts `php artisan serve --host=127.0.0.1 --port=8000`, `php artisan queue:listen --queue=email,imports,default ...`, and `php artisan schedule:work`. If you start processes manually, run all three pieces in separate terminals: the local server on port 8000, the queue worker above, and `php artisan schedule:work`.
+
+## Contact Imports
+
+Imports support `.csv`, `.txt`, and `.xlsx` files up to 20 MB. The import page provides fillable sample downloads at `/imports/sample/csv` and `/imports/sample/xlsx`. The only required mapped field is email; optional contact fields include name, phone, company, job title, location, source, consent status, and notes. Unmapped columns are preserved in contact metadata.
+
+The import workflow is upload, validation preview, mapping adjustment, then confirm. The preview shows detected headers, valid rows, invalid rows, duplicate rows, warnings, and sample row data before contacts are created or updated. Failed processed rows are stored and can be downloaded from the import detail page.
+
+Duplicate modes:
+
+- `skip`: create only new contacts and leave existing contacts unchanged.
+- `update`: update existing contacts only; missing contacts are reported as failed rows.
+- `add_to_list_tag`: attach selected lists/tags to existing contacts without overwriting their fields.
+- `upsert`: create missing contacts and update existing contacts.
+
+Import files are stored on the private local disk and processed on the `imports` queue. `ProcessImport` is unique per import id while pending/running and marks unreadable files as failed with an audit event.
+
+## Activity Logs
+
+`/activity-logs` is restricted to owner/admin users. It reads the `activity_logs` audit table, not provider delivery events, and includes filters for search, category, event, severity, and actor. Export uses the same filters.
+
+The audit trail records model creates/updates/deletes, auth sign-in events, import lifecycle events, campaign send/resume/cancel/retry actions, contact bulk actions, list membership changes, and webhook accepted/rejected events. Sensitive keys and large provider/import payload fields are recursively redacted before they are stored. Query strings are not stored in audit URLs.
+
+Activity logs include user email, IP address, user agent, and operational metadata, so production deployments should define retention/pruning expectations based on compliance needs.
 
 ## Campaign Variables And Sending
 

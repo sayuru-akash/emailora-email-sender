@@ -187,10 +187,10 @@ const previewHtml = computed(() => {
 
     return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"></head><body>${html}</body></html>`;
 });
-const hasUnsubscribe = computed(() =>
-    variablesIn(
-        `${form.preheader} ${form.html_body} ${form.text_body}`,
-    ).includes('unsubscribe_url'),
+const hasBodyUnsubscribe = computed(() =>
+    variablesIn(`${form.html_body} ${form.text_body}`).includes(
+        'unsubscribe_url',
+    ),
 );
 const audienceSummary = computed(() => {
     if (form.target_type === 'all_contacts') {
@@ -1237,13 +1237,13 @@ refreshEstimate();
                         </div>
 
                         <div
-                            v-if="!hasUnsubscribe"
+                            v-if="!hasBodyUnsubscribe"
                             class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
                         >
-                            This message does not include
+                            This message body does not include
                             <code v-pre>{{ unsubscribe_url }}</code
-                            >. Sending will be blocked until the unsubscribe URL
-                            token is present.
+                            >. Emailora will add an unsubscribe footer when the
+                            campaign is saved or sent.
                         </div>
                         <div
                             v-if="campaignError"

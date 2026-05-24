@@ -111,6 +111,73 @@ class CampaignLifecycleTest extends TestCase
             ->assertRedirect();
     }
 
+    public function test_campaign_store_appends_unsubscribe_footer_when_body_only_mentions_token_name(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.store'), [
+                'name' => 'Footer guard',
+                'subject' => 'Hello students',
+                'from_name' => 'Emailora',
+                'from_email' => 'sender@example.com',
+                'html_body' => '<p>This body mentions unsubscribe_url but has no unsubscribe token.</p>',
+                'text_body' => 'This body already has {unsubscribe_url}.',
+                'provider' => 'brevo',
+                'target_type' => 'all_contacts',
+                'status' => 'draft',
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $campaign = EmailCampaign::query()->where('name', 'Footer guard')->firstOrFail();
+
+        $this->assertStringContainsString('mentions unsubscribe_url', $campaign->html_body);
+        $this->assertStringContainsString('<a href="{{ unsubscribe_url }}">Unsubscribe</a>', $campaign->html_body);
+        $this->assertSame('This body already has {unsubscribe_url}.', $campaign->text_body);
+    }
+
+    public function test_send_appends_unsubscribe_footer_to_each_non_empty_body_part_that_lacks_a_token(): void
+    {
+        Queue::fake();
+        Contact::factory()->create(['status' => 'active']);
+        $campaign = EmailCampaign::factory()->create([
+            'html_body' => '<p><a href="{{ unsubscribe_url }}">Unsubscribe</a></p>',
+            'text_body' => 'Plain-text copy without a link.',
+            'target_type' => 'all_contacts',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.send', $campaign))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $campaign->refresh();
+
+        $this->assertSame('<p><a href="{{ unsubscribe_url }}">Unsubscribe</a></p>', $campaign->html_body);
+        $this->assertStringContainsString('Plain-text copy without a link.', $campaign->text_body);
+        $this->assertStringContainsString('Unsubscribe: {{ unsubscribe_url }}', $campaign->text_body);
+    }
+
+    public function test_preheader_unsubscribe_token_does_not_suppress_visible_body_footer(): void
+    {
+        Queue::fake();
+        Contact::factory()->create(['status' => 'active']);
+        $campaign = EmailCampaign::factory()->create([
+            'preheader' => '{{ unsubscribe_url }}',
+            'html_body' => '<p>Body copy without a visible unsubscribe token.</p>',
+            'text_body' => '',
+            'target_type' => 'all_contacts',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs(User::factory()->create())
+            ->post(route('campaigns.send', $campaign))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $this->assertStringContainsString('<a href="{{ unsubscribe_url }}">Unsubscribe</a>', $campaign->refresh()->html_body);
+    }
+
     public function test_pause_resume_and_cancel_are_status_guarded(): void
     {
         Queue::fake();

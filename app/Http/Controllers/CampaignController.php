@@ -13,6 +13,7 @@ use App\Models\EmailCampaign;
 use App\Models\EmailTemplate;
 use App\Models\ListModel;
 use App\Models\Tag;
+use App\Services\Activity\ActivityLogger;
 use App\Services\Email\AudienceResolver;
 use App\Services\Email\CampaignCountRefresher;
 use App\Services\Email\EmailPersonalizer;
@@ -165,17 +166,24 @@ class CampaignController extends Controller
         }
 
         $recipientMode = $request->string('recipient_mode')->toString() ?: 'current_audience';
+        $scheduled = $request->filled('scheduled_at');
+        $audienceCount = $resolver->queryForCampaign($campaign)->count();
         $campaign->update([
-            'status' => $request->filled('scheduled_at') ? 'scheduled' : 'queued',
+            'status' => $scheduled ? 'scheduled' : 'queued',
             'scheduled_at' => $request->date('scheduled_at'),
             'recipient_mode' => $recipientMode,
         ]);
+        app(ActivityLogger::class)->log($scheduled ? 'campaign.scheduled' : 'campaign.queued', $scheduled ? 'Campaign was scheduled.' : 'Campaign was queued for sending.', $campaign, [
+            'recipient_mode' => $recipientMode,
+            'audience_count' => $audienceCount,
+            'scheduled_at' => $campaign->scheduled_at?->toIso8601String(),
+        ], 'campaigns');
 
-        if (! $request->filled('scheduled_at')) {
+        if (! $scheduled) {
             PrepareEmailCampaignRecipients::dispatch($campaign->id, $recipientMode)->onQueue('email');
         }
 
-        return back()->with('success', $request->filled('scheduled_at') ? 'Campaign scheduled.' : 'Campaign queued.');
+        return back()->with('success', $scheduled ? 'Campaign scheduled.' : 'Campaign queued.');
     }
 
     public function pause(EmailCampaign $campaign): RedirectResponse
@@ -183,6 +191,7 @@ class CampaignController extends Controller
         abort_unless(in_array($campaign->status, ['queued', 'preparing', 'sending'], true), 422, 'Only active campaigns can be paused.');
 
         $campaign->update(['status' => 'paused']);
+        app(ActivityLogger::class)->log('campaign.paused', 'Campaign was paused.', $campaign, [], 'campaigns', 'warning');
 
         return back()->with('success', 'Campaign paused.');
     }
@@ -193,6 +202,9 @@ class CampaignController extends Controller
 
         $campaign->update(['status' => 'queued']);
         PrepareEmailCampaignRecipients::dispatch($campaign->id, $campaign->recipient_mode ?: 'current_audience')->onQueue('email');
+        app(ActivityLogger::class)->log('campaign.resumed', 'Campaign was resumed.', $campaign, [
+            'recipient_mode' => $campaign->recipient_mode ?: 'current_audience',
+        ], 'campaigns');
 
         return back()->with('success', 'Campaign resumed.');
     }
@@ -202,6 +214,7 @@ class CampaignController extends Controller
         abort_unless(in_array($campaign->status, ['scheduled', 'queued', 'preparing', 'sending', 'paused'], true), 422, 'Only scheduled or active campaigns can be cancelled.');
 
         $campaign->update(['status' => 'cancelled', 'completed_at' => now()]);
+        app(ActivityLogger::class)->log('campaign.cancelled', 'Campaign was cancelled.', $campaign, [], 'campaigns', 'warning');
 
         return back()->with('success', 'Campaign cancelled.');
     }
@@ -215,6 +228,10 @@ class CampaignController extends Controller
 
         $campaign->recipients()->whereIn('id', $failedIds)->update(['status' => 'queued', 'error_message' => null]);
         $failedIds->each(fn ($id) => SendSingleEmail::dispatch($id)->onQueue('email'));
+        app(ActivityLogger::class)->log('campaign.failed_recipients_requeued', 'Failed campaign recipients were requeued.', $campaign, [
+            'count' => $failedIds->count(),
+            'recipient_ids' => $failedIds->take(50)->values()->all(),
+        ], 'campaigns');
 
         return back()->with('success', 'Failed recipients queued.');
     }
@@ -226,6 +243,10 @@ class CampaignController extends Controller
         abort_unless($recipient->status === 'failed', 422, 'Only failed recipients can be retried.');
         $recipient->update(['status' => 'queued', 'error_message' => null]);
         SendSingleEmail::dispatch($recipient->id)->onQueue('email');
+        app(ActivityLogger::class)->log('campaign.recipient_requeued', 'Campaign recipient was requeued.', $campaign, [
+            'recipient_id' => $recipient->id,
+            'email_normalized' => $recipient->email_normalized,
+        ], 'campaigns');
 
         return back()->with('success', 'Recipient retry queued.');
     }
@@ -385,19 +406,20 @@ class CampaignController extends Controller
         $html = (string) ($data['html_body'] ?? '');
         $text = (string) ($data['text_body'] ?? '');
 
-        if (str_contains($html.$text, 'unsubscribe_url')) {
-            return $data;
-        }
-
-        if ($html !== '') {
+        if ($html !== '' && ! $this->containsUnsubscribeToken($html)) {
             $data['html_body'] = rtrim($html)."\n".'<p style="margin-top:24px;font-size:12px;color:#64748b;">No longer want these emails? <a href="{{ unsubscribe_url }}">Unsubscribe</a>.</p>';
         }
 
-        if ($text !== '') {
+        if ($text !== '' && ! $this->containsUnsubscribeToken($text)) {
             $data['text_body'] = rtrim($text)."\n\nUnsubscribe: {{ unsubscribe_url }}";
         }
 
         return $data;
+    }
+
+    private function containsUnsubscribeToken(string $content): bool
+    {
+        return (bool) preg_match('/\{\{\s*unsubscribe_url\s*}}|\{\s*unsubscribe_url\s*}/', $content);
     }
 
     private function selectedContacts(?EmailCampaign $campaign): array

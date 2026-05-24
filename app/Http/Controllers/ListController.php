@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\BuildsTableProps;
 use App\Http\Requests\ListRequest;
 use App\Models\Contact;
 use App\Models\ListModel;
+use App\Services\Activity\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -80,6 +81,10 @@ class ListController extends Controller
     {
         $data = $request->validate(['contact_ids' => ['required', 'array'], 'contact_ids.*' => ['integer', 'exists:contacts,id']]);
         $list->contacts()->syncWithoutDetaching($data['contact_ids']);
+        app(ActivityLogger::class)->log('list.contacts_added', 'Contacts were added to list.', $list, [
+            'count' => count($data['contact_ids']),
+            'contact_ids' => array_slice($data['contact_ids'], 0, 50),
+        ], 'contacts');
 
         return back()->with('success', 'Contacts added.');
     }
@@ -88,6 +93,10 @@ class ListController extends Controller
     {
         $data = $request->validate(['contact_ids' => ['required', 'array'], 'contact_ids.*' => ['integer', 'exists:contacts,id']]);
         $list->contacts()->detach($data['contact_ids']);
+        app(ActivityLogger::class)->log('list.contacts_removed', 'Contacts were removed from list.', $list, [
+            'count' => count($data['contact_ids']),
+            'contact_ids' => array_slice($data['contact_ids'], 0, 50),
+        ], 'contacts', 'warning');
 
         return back()->with('success', 'Contacts removed.');
     }

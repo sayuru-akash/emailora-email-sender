@@ -3,16 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\BuildsTableProps;
+use App\Http\Requests\ContactImportRequest;
+use App\Http\Requests\ImportMappingRequest;
 use App\Jobs\ProcessImport;
 use App\Models\ContactImport;
 use App\Models\ListModel;
 use App\Models\Tag;
+use App\Services\Activity\ActivityLogger;
+use App\Services\Imports\ContactImportFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ImportController extends Controller
 {
@@ -27,51 +34,136 @@ class ImportController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('Imports/Create', ['lists' => ListModel::active()->get(['id', 'name']), 'tags' => Tag::orderBy('name')->get(['id', 'name'])]);
+        return Inertia::render('Imports/Create', [
+            'lists' => ListModel::active()->orderBy('name')->get(['id', 'name']),
+            'tags' => Tag::orderBy('name')->get(['id', 'name']),
+            'duplicateOptions' => [
+                ['value' => 'skip', 'label' => 'Skip existing contacts', 'description' => 'New contacts are created and matching emails are left unchanged.'],
+                ['value' => 'update', 'label' => 'Update existing contacts', 'description' => 'Matching emails are updated from the file and new contacts are created.'],
+                ['value' => 'add_to_list_tag', 'label' => 'Only attach lists and tags', 'description' => 'Existing contacts keep their details and only receive the selected audience labels.'],
+                ['value' => 'upsert', 'label' => 'Create or update all', 'description' => 'Every valid row is synchronized into the contact database.'],
+            ],
+        ]);
     }
 
-    public function upload(Request $request): RedirectResponse
+    public function sample(string $format, ContactImportFile $files): HttpResponse
     {
-        $data = $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:20480'],
-            'duplicate_handling' => ['required', 'in:skip,update,add_to_list_tag,upsert'],
-            'list_ids' => ['array'],
-            'tag_ids' => ['array'],
-        ]);
+        abort_unless(in_array($format, ['csv', 'xlsx'], true), 404);
 
-        $path = $data['file']->store('imports');
+        if ($format === 'xlsx') {
+            return response($files->sampleXlsx(), 200, [
+                'Content-Disposition' => 'attachment; filename="emailora-contact-import-sample.xlsx"',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+
+        return response($files->sampleCsv(), 200, [
+            'Content-Disposition' => 'attachment; filename="emailora-contact-import-sample.csv"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function upload(ContactImportRequest $request, ContactImportFile $files, ActivityLogger $activity): RedirectResponse
+    {
+        $data = $request->validated();
+        $uploaded = $data['file'];
+        $path = $uploaded->store('imports');
         $import = ContactImport::create([
-            'file_name' => $data['file']->getClientOriginalName(),
+            'file_name' => $uploaded->getClientOriginalName(),
             'disk_path' => $path,
-            'file_type' => $data['file']->getClientOriginalExtension(),
+            'file_type' => strtolower($uploaded->getClientOriginalExtension()),
             'duplicate_handling' => $data['duplicate_handling'],
             'assigned_list_ids' => $data['list_ids'] ?? [],
             'assigned_tag_ids' => $data['tag_ids'] ?? [],
             'uploaded_by' => $request->user()->id,
         ]);
 
-        return redirect()->route('imports.mapping', $import)->with('success', 'Import uploaded.');
+        try {
+            $analysis = $files->analyze($import);
+            $import->update([
+                'mapping' => $analysis['mapping'],
+                'preview_rows' => $analysis,
+                'total_rows' => $analysis['summary']['total_rows'],
+            ]);
+        } catch (Throwable $exception) {
+            Storage::delete($path);
+            $import->delete();
+
+            report($exception);
+
+            return back()->withErrors(['file' => 'The file could not be read. Check that it is a valid CSV or XLSX file and try again.'])->withInput();
+        }
+
+        $activity->log('import.uploaded', 'Contact import file uploaded and previewed.', $import, [
+            'file_name' => $import->file_name,
+            'file_type' => $import->file_type,
+            'total_rows' => $analysis['summary']['total_rows'],
+            'valid_rows' => $analysis['summary']['valid_rows'],
+            'invalid_rows' => $analysis['summary']['invalid_rows'],
+            'duplicate_rows' => $analysis['summary']['duplicate_rows'],
+        ], 'imports');
+
+        return redirect()->route('imports.mapping', $import)->with('success', 'Import uploaded. Review the validation preview before confirming.');
     }
 
-    public function mapping(ContactImport $import): Response
+    public function mapping(ContactImport $import, ContactImportFile $files): Response
     {
-        return Inertia::render('Imports/Mapping', ['import' => $import]);
+        $analysis = $import->preview_rows ?: $files->analyze($import, $import->mapping ?: null);
+
+        if (! $import->preview_rows) {
+            $import->update([
+                'mapping' => $analysis['mapping'],
+                'preview_rows' => $analysis,
+                'total_rows' => $analysis['summary']['total_rows'],
+            ]);
+        }
+
+        return Inertia::render('Imports/Mapping', [
+            'import' => $import->fresh(),
+            'headers' => $analysis['headers'],
+            'mapping' => $analysis['mapping'],
+            'previewRows' => $analysis['preview_rows'],
+            'summary' => $analysis['summary'],
+            'fieldOptions' => ContactImportFile::CONTACT_FIELDS,
+        ]);
     }
 
-    public function preview(Request $request, ContactImport $import): RedirectResponse
+    public function preview(ImportMappingRequest $request, ContactImport $import, ContactImportFile $files, ActivityLogger $activity): RedirectResponse
     {
-        $import->update(['mapping' => $request->input('mapping', []), 'status' => 'mapped']);
+        $mapping = $request->validated('mapping');
+        $analysis = $files->analyze($import, $mapping);
+        $import->update([
+            'mapping' => $mapping,
+            'preview_rows' => $analysis,
+            'status' => 'mapped',
+            'total_rows' => $analysis['summary']['total_rows'],
+        ]);
 
-        return back()->with('success', 'Mapping saved.');
+        $activity->log('import.mapping_updated', 'Contact import mapping and validation preview updated.', $import, [
+            'mapping' => $mapping,
+            'summary' => $analysis['summary'],
+        ], 'imports');
+
+        return back()->with('success', 'Validation preview refreshed.');
     }
 
-    public function confirm(ContactImport $import): RedirectResponse
+    public function confirm(ContactImport $import, ActivityLogger $activity): RedirectResponse
     {
-        if (! in_array($import->status, ['uploaded', 'mapped'], true)) {
+        $updated = ContactImport::query()
+            ->whereKey($import->id)
+            ->whereIn('status', ['uploaded', 'mapped'])
+            ->update(['status' => 'queued']);
+
+        if ($updated !== 1) {
             return back()->withErrors(['import' => 'This import was already confirmed.']);
         }
 
-        $import->update(['status' => 'queued']);
+        $import->refresh();
+        $activity->log('import.confirmed', 'Contact import confirmed and queued.', $import, [
+            'file_name' => $import->file_name,
+            'total_rows' => $import->total_rows,
+            'duplicate_handling' => $import->duplicate_handling,
+        ], 'imports');
         ProcessImport::dispatch($import->id)->onQueue('imports');
 
         return redirect()->route('imports.show', $import)->with('success', 'Import queued.');
@@ -79,15 +171,17 @@ class ImportController extends Controller
 
     public function show(Request $request, ContactImport $import): Response|JsonResponse
     {
-        $failedRows = $import->rows()
-            ->where('status', 'failed')
+        $rows = $import->rows()
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
             ->orderBy('row_number')
-            ->paginate($this->perPage($request->input('per_page')), ['*'], 'failed_page')
+            ->paginate($this->perPage($request->input('per_page')))
             ->withQueryString();
 
         $payload = [
             'import' => $import->loadCount('rows'),
-            'failedRows' => $this->pagination($failedRows),
+            'rows' => $this->pagination($rows),
+            'filters' => $request->only(['status', 'per_page']),
+            'statusOptions' => ['created', 'updated', 'duplicate', 'failed'],
         ];
 
         return request()->wantsJson() ? response()->json($payload) : Inertia::render('Imports/Show', $payload);
@@ -104,6 +198,10 @@ class ImportController extends Controller
 
     public function destroy(ContactImport $import): RedirectResponse
     {
+        if ($import->disk_path) {
+            Storage::delete($import->disk_path);
+        }
+
         $import->delete();
 
         return back()->with('success', 'Import deleted.');

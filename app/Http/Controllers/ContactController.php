@@ -8,6 +8,7 @@ use App\Models\Contact;
 use App\Models\EmailMessage;
 use App\Models\ListModel;
 use App\Models\Tag;
+use App\Services\Activity\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -62,6 +63,10 @@ class ContactController extends Controller
         $contact = Contact::create($data);
         $contact->lists()->sync($listIds);
         $contact->tags()->sync($tagIds);
+        app(ActivityLogger::class)->log('contact.membership_synced', 'Contact list and tag membership synced.', $contact, [
+            'list_count' => count($listIds),
+            'tag_count' => count($tagIds),
+        ], 'contacts');
 
         return redirect()->route('contacts.show', $contact)->with('success', 'Contact saved.');
     }
@@ -90,6 +95,10 @@ class ContactController extends Controller
         $contact->update($data);
         $contact->lists()->sync($listIds);
         $contact->tags()->sync($tagIds);
+        app(ActivityLogger::class)->log('contact.membership_synced', 'Contact list and tag membership synced.', $contact, [
+            'list_count' => count($listIds),
+            'tag_count' => count($tagIds),
+        ], 'contacts');
 
         return back()->with('success', 'Contact updated.');
     }
@@ -104,6 +113,7 @@ class ContactController extends Controller
     public function block(Contact $contact): RedirectResponse
     {
         $contact->update(['status' => 'blocked', 'blocked_at' => now()]);
+        app(ActivityLogger::class)->log('contact.blocked', 'Contact was blocked.', $contact, [], 'contacts', 'warning');
 
         return back()->with('success', 'Contact blocked.');
     }
@@ -111,6 +121,7 @@ class ContactController extends Controller
     public function unsubscribe(Contact $contact): RedirectResponse
     {
         $contact->update(['status' => 'unsubscribed', 'unsubscribed_at' => now()]);
+        app(ActivityLogger::class)->log('contact.unsubscribed', 'Contact was manually unsubscribed.', $contact, [], 'contacts', 'warning');
 
         return back()->with('success', 'Unsubscribe recorded.');
     }
@@ -130,6 +141,11 @@ class ContactController extends Controller
             'unsubscribe' => $contacts->update(['status' => 'unsubscribed', 'unsubscribed_at' => now()]),
             'delete' => $contacts->delete(),
         };
+        app(ActivityLogger::class)->log('contact.bulk_action', 'Bulk contact action completed.', null, [
+            'action' => $validated['action'],
+            'count' => count($validated['ids']),
+            'ids' => array_slice($validated['ids'], 0, 50),
+        ], 'contacts', $validated['action'] === 'delete' ? 'warning' : 'info');
 
         return back()->with('success', 'Bulk action completed.');
     }

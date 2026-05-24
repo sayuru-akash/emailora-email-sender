@@ -27,7 +27,10 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - `contacts.email_normalized` is the canonical duplicate key.
 - Contact membership is stored in `contact_list` and `contact_tag`; never pass `list_ids` or `tag_ids` into `Contact::create()` / `update()`. Pull them out, then `sync()` relationships.
 - Lists use the `lists` table through `App\Models\ListModel`.
-- Imports currently parse CSV-style files. Do not claim XLSX support unless parser support is added and tested.
+- Imports parse CSV/TXT through `fgetcsv()` and XLSX through `App\Services\Imports\ContactImportFile`. Keep sample downloads, validation preview, mapping, duplicate handling, row results, and list/tag assignment covered when changing imports.
+- Import files are private local storage. Delete stored files when deleting imports and mark processing failures as failed instead of leaving jobs stuck in `queued` or `processing`.
+- Activity logs live in `activity_logs` and `/activity-logs` is owner/admin-only. Use semantic aggregate logs for bulk operations and queue/webhook actions because query updates and pivot syncs do not fire model observers.
+- Do not store provider payloads, raw import rows, personalized bodies, tokens, headers, signatures, cookies, or API keys in activity properties. Use the recursive redaction path in `ActivityLogger` and model allowlists in `ActivityLogObserver`.
 
 ## Personalization
 
@@ -44,7 +47,8 @@ This repo is the Emailora Laravel/Inertia/Vue email campaign system. Keep work i
 - Scheduled campaigns are queued by `emailora:campaigns:queue-scheduled`.
 - Active/stuck campaigns are recovered by `emailora:campaigns:recover`.
 - Stale campaigns are finalized by `emailora:campaigns:finalize-stuck`.
-- Production must run `php artisan schedule:run` every minute and a monitored queue worker.
+- Local `composer dev` must keep listening to `--queue=email,imports,default` and run `php artisan schedule:work`; `php artisan serve` alone is not enough for queued campaigns/imports.
+- Production must run `php artisan schedule:run` every minute and a monitored queue worker with `--queue=email,imports,default --timeout=300`; `DB_QUEUE_RETRY_AFTER` must be greater than the timeout, for example `420`.
 - A queued/preparing campaign with no `campaign_recipients` yet should show its target audience count in the UI. The recover command should prepare recipients, not finalize it as empty.
 - `PrepareEmailCampaignRecipients` and `SendEmailCampaignMessages` are unique per campaign while pending/processing to avoid repeated recover runs piling up duplicate work.
 - After manual local queue fixes, verify `jobs=0`, `failed_jobs=0`, campaign counts, and recipient statuses before reporting success.

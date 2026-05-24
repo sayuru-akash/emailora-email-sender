@@ -36,6 +36,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/lists/{list}/export', [ListController::class, 'export'])->name('lists.export');
     Route::resource('lists', ListController::class);
 
+    Route::get('/imports/sample/{format}', [ImportController::class, 'sample'])->whereIn('format', ['csv', 'xlsx'])->name('imports.sample');
     Route::get('/imports/create', [ImportController::class, 'create'])->name('imports.create');
     Route::post('/imports/upload', [ImportController::class, 'upload'])->name('imports.upload');
     Route::get('/imports/{import}/mapping', [ImportController::class, 'mapping'])->name('imports.mapping');
@@ -75,7 +76,10 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/segments/{segment}/preview', [SavedSegmentController::class, 'preview'])->name('segments.preview');
     Route::resource('segments', SavedSegmentController::class);
 
-    Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+    Route::middleware('role:owner,admin')->group(function () {
+        Route::get('/activity-logs/export', [ActivityLogController::class, 'export'])->name('activity-logs.export');
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
+    });
 });
 
 Route::middleware(['auth', 'active', 'role:owner,admin'])->group(function () {
