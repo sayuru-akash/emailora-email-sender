@@ -11,7 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('email_campaigns', function (Blueprint $table) {
+        $driver = Schema::getConnection()->getDriverName();
+
+        Schema::create('email_campaigns', function (Blueprint $table) use ($driver) {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->string('name');
@@ -22,7 +24,10 @@ return new class extends Migration
             $table->string('reply_to_email')->nullable();
             $table->longText('html_body')->nullable();
             $table->longText('text_body')->nullable();
-            $table->foreignId('email_template_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('email_template_id')->nullable()->index();
+            if ($driver !== 'mysql') {
+                $table->foreign('email_template_id')->references('id')->on('email_templates')->nullOnDelete();
+            }
             $table->string('provider')->nullable()->index();
             $table->string('provider_account_id')->nullable();
             $table->string('target_type')->default('all_contacts')->index();
