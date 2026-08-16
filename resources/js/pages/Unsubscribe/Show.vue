@@ -1,25 +1,39 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
+import PublicLayout from '@/layouts/public/PublicLayout.vue';
 const props = defineProps<{ token: string; storeUrl: string }>();
 const page = usePage();
 </script>
 <template>
-    <Head title="Unsubscribe" />
-    <main class="mx-auto flex min-h-screen max-w-md items-center px-4">
-        <section class="w-full rounded-lg border bg-card p-6 text-center">
-            <h1 class="text-xl font-semibold">Unsubscribe</h1>
-            <p class="mt-2 text-sm text-muted-foreground">
-                {{
-                    (page.props.flash as any)?.success ??
-                    'Stop future marketing emails for this address.'
-                }}
-            </p>
-            <button
-                class="mt-5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
-                @click="router.post(props.storeUrl)"
+    <Head title="Unsubscribe">
+        <meta
+            head-key="robots"
+            name="robots"
+            content="noindex, nofollow, noarchive"
+        />
+    </Head>
+
+    <PublicLayout>
+        <main
+            class="mx-auto flex min-h-[calc(100svh-10rem)] max-w-md items-center px-4 py-12"
+        >
+            <section
+                class="w-full rounded-lg border bg-card p-6 text-center shadow-sm"
             >
-                Confirm
-            </button>
-        </section>
-    </main>
+                <h1 class="text-xl font-semibold">Unsubscribe</h1>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    {{
+                        (page.props.flash as any)?.success ??
+                        'Stop future marketing emails for this address.'
+                    }}
+                </p>
+                <button
+                    class="mt-5 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground"
+                    @click="router.post(props.storeUrl)"
+                >
+                    Confirm
+                </button>
+            </section>
+        </main>
+    </PublicLayout>
 </template>

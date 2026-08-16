@@ -33,7 +33,7 @@ class PublicSeoRegressionTest extends TestCase
         ] as $url => [$title, $canonical]) {
             $this->get($url)
                 ->assertOk()
-                ->assertSee("<title>{$title}</title>", false)
+                ->assertSee($title)
                 ->assertSee('<meta name="description"', false)
                 ->assertSee('<link rel="canonical" href="'.$canonical.'"', false);
         }

@@ -12,9 +12,9 @@ class SeoController extends Controller
     public static function sitemapPages(): array
     {
         return [
-            ['path' => '/', 'lastmod' => '2026-05-24', 'changefreq' => 'weekly', 'priority' => '1.0'],
-            ['path' => '/privacy', 'lastmod' => '2026-05-24', 'changefreq' => 'yearly', 'priority' => '0.4'],
-            ['path' => '/terms', 'lastmod' => '2026-05-24', 'changefreq' => 'yearly', 'priority' => '0.4'],
+            ['path' => '/', 'lastmod' => '2026-08-17', 'changefreq' => 'weekly', 'priority' => '1.0'],
+            ['path' => '/privacy', 'lastmod' => '2026-08-17', 'changefreq' => 'yearly', 'priority' => '0.4'],
+            ['path' => '/terms', 'lastmod' => '2026-08-17', 'changefreq' => 'yearly', 'priority' => '0.4'],
         ];
     }
 
@@ -22,23 +22,35 @@ class SeoController extends Controller
     {
         $lines = [
             'User-agent: *',
+            'Disallow: /activity-logs',
+            'Disallow: /confirm-password',
             'Disallow: /dashboard',
             'Disallow: /contacts',
             'Disallow: /campaigns',
+            'Disallow: /email',
+            'Disallow: /forgot-password',
             'Disallow: /imports',
             'Disallow: /lists',
+            'Disallow: /login',
+            'Disallow: /profile',
+            'Disallow: /register',
+            'Disallow: /reset-password',
             'Disallow: /reports',
             'Disallow: /segments',
             'Disallow: /settings',
             'Disallow: /tags',
             'Disallow: /templates',
+            'Disallow: /two-factor-challenge',
+            'Disallow: /unsubscribe/',
+            'Disallow: /up',
             'Disallow: /users',
-            'Disallow: /activity-logs',
+            'Disallow: /webhooks/',
             'Sitemap: '.$this->absoluteUrl('/sitemap.xml'),
         ];
 
         return response(implode("\n", $lines)."\n", 200)
             ->header('Content-Type', 'text/plain; charset=UTF-8')
+            ->header('X-Robots-Tag', 'noindex, nofollow, noarchive')
             ->header('Cache-Control', 'public, max-age=3600, s-maxage=86400');
     }
 
@@ -57,6 +69,7 @@ XML;
 
         return response($xml."\n", 200)
             ->header('Content-Type', 'application/xml; charset=UTF-8')
+            ->header('X-Robots-Tag', 'noindex, nofollow, noarchive')
             ->header('Cache-Control', 'public, max-age=3600, s-maxage=86400');
     }
 

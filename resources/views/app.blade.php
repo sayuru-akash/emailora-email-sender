@@ -26,35 +26,53 @@
         @fonts
 
         @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
-        <x-inertia::head>
-            <title>{{ config('app.name', 'Laravel') }}</title>
-        </x-inertia::head>
         @php
+            $ssrResponse = app(\Inertia\Ssr\SsrState::class)->dispatch();
             $component = $page['component'] ?? '';
             $seo = $page['props']['seo'] ?? null;
+            $errorStatus = (int) ($page['props']['status'] ?? 0);
+            $errorTitle = match ($errorStatus) {
+                403 => 'Access denied',
+                404 => 'Page not found',
+                405 => 'Action not available',
+                419 => 'Session expired',
+                429 => 'Too many requests',
+                500 => 'Something went wrong',
+                503 => 'Service temporarily unavailable',
+                default => 'Something went wrong',
+            };
         @endphp
-        @if ($seo)
-            <title>{{ $seo['fullTitle'] }}</title>
-            <meta name="description" content="{{ $seo['description'] }}">
-            <meta name="robots" content="{{ $seo['robots'] }}">
-            <link rel="canonical" href="{{ $seo['canonical'] }}">
-            <meta property="og:type" content="{{ $component === 'Welcome' ? 'website' : 'article' }}">
-            <meta property="og:title" content="{{ $seo['fullTitle'] }}">
-            <meta property="og:description" content="{{ $seo['description'] }}">
-            <meta property="og:url" content="{{ $seo['canonical'] }}">
-            <meta property="og:image" content="{{ $seo['image'] }}">
-            <meta property="og:image:alt" content="{{ $seo['imageAlt'] }}">
-            <meta property="og:image:width" content="{{ $seo['imageWidth'] }}">
-            <meta property="og:image:height" content="{{ $seo['imageHeight'] }}">
-            <meta property="og:site_name" content="{{ $seo['siteName'] }}">
-            <meta property="og:locale" content="{{ $seo['locale'] }}">
-            <meta name="twitter:card" content="summary_large_image">
-            <meta name="twitter:title" content="{{ $seo['fullTitle'] }}">
-            <meta name="twitter:description" content="{{ $seo['description'] }}">
-            <meta name="twitter:image" content="{{ $seo['image'] }}">
-            <meta name="twitter:image:alt" content="{{ $seo['imageAlt'] }}">
-        @elseif (\Illuminate\Support\Str::startsWith($component, 'auth/'))
-            <meta name="robots" content="noindex,follow">
+        @if ($ssrResponse)
+            {!! $ssrResponse->head !!}
+        @else
+            @if ($seo)
+                <title>{{ $seo['fullTitle'] }}</title>
+                <meta name="description" content="{{ $seo['description'] }}">
+                <meta name="robots" content="{{ $seo['robots'] }}">
+                <link rel="canonical" href="{{ $seo['canonical'] }}">
+                <meta property="og:type" content="{{ $component === 'Welcome' ? 'website' : 'article' }}">
+                <meta property="og:title" content="{{ $seo['fullTitle'] }}">
+                <meta property="og:description" content="{{ $seo['description'] }}">
+                <meta property="og:url" content="{{ $seo['canonical'] }}">
+                <meta property="og:image" content="{{ $seo['image'] }}">
+                <meta property="og:image:alt" content="{{ $seo['imageAlt'] }}">
+                <meta property="og:image:width" content="{{ $seo['imageWidth'] }}">
+                <meta property="og:image:height" content="{{ $seo['imageHeight'] }}">
+                <meta property="og:site_name" content="{{ $seo['siteName'] }}">
+                <meta property="og:locale" content="{{ $seo['locale'] }}">
+                <meta name="twitter:card" content="summary_large_image">
+                <meta name="twitter:title" content="{{ $seo['fullTitle'] }}">
+                <meta name="twitter:description" content="{{ $seo['description'] }}">
+                <meta name="twitter:image" content="{{ $seo['image'] }}">
+                <meta name="twitter:image:alt" content="{{ $seo['imageAlt'] }}">
+            @else
+                @if ($component === 'errors/ErrorPage')
+                    <title>{{ $errorTitle }} - Emailora</title>
+                @else
+                    <title>{{ config('app.name', 'Emailora') }}</title>
+                @endif
+                <meta name="robots" content="noindex, nofollow, noarchive">
+            @endif
         @endif
         @if ($component === 'Welcome' && $seo)
             @php

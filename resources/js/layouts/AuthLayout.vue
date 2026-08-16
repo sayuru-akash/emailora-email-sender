@@ -10,7 +10,11 @@ const { title = '', description = '' } = defineProps<{
 
 <template>
     <Head>
-        <meta name="robots" content="noindex,follow" />
+        <meta
+            head-key="robots"
+            name="robots"
+            content="noindex, nofollow, noarchive"
+        />
     </Head>
 
     <AuthLayout :title="title" :description="description">

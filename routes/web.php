@@ -20,6 +20,7 @@ use App\Http\Controllers\Webhooks\BrevoWebhookController;
 use App\Http\Controllers\Webhooks\ResendWebhookController;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\PreventSearchIndexing;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -39,6 +40,7 @@ Route::withoutMiddleware([
     PreventRequestForgery::class,
     HandleAppearance::class,
     HandleInertiaRequests::class,
+    PreventSearchIndexing::class,
     AddLinkHeadersForPreloadedAssets::class,
 ])->group(function () {
     Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');

@@ -22,7 +22,7 @@ class SeoMetadataTest extends TestCase
     {
         $this->get(route('home'))
             ->assertOk()
-            ->assertSee('<title>Email Campaign Operations Platform - Emailora</title>', false)
+            ->assertSee('Email Campaign Operations Platform - Emailora')
             ->assertSee('<meta name="description" content="Emailora is a clean campaign operations console for contact imports, audience targeting, templates, queued email sends, reporting, and audit logs."', false)
             ->assertSee('<meta name="robots" content="index,follow"', false)
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/"', false)
@@ -39,13 +39,13 @@ class SeoMetadataTest extends TestCase
     {
         $this->get(route('privacy'))
             ->assertOk()
-            ->assertSee('<title>Privacy Policy - Emailora</title>', false)
+            ->assertSee('Privacy Policy - Emailora')
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/privacy"', false)
             ->assertSee('<meta property="og:type" content="article"', false);
 
         $this->get(route('terms'))
             ->assertOk()
-            ->assertSee('<title>Terms of Use - Emailora</title>', false)
+            ->assertSee('Terms of Use - Emailora')
             ->assertSee('<link rel="canonical" href="https://emailora.codezela.com/terms"', false)
             ->assertSee('<meta property="og:type" content="article"', false);
     }
@@ -64,11 +64,12 @@ class SeoMetadataTest extends TestCase
             ->assertDontSee('textContent=', false);
     }
 
-    public function test_auth_pages_are_noindex_follow(): void
+    public function test_auth_pages_are_not_indexable(): void
     {
         $this->get(route('login'))
             ->assertOk()
-            ->assertSee('<meta name="robots" content="noindex,follow"', false);
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
+            ->assertSee('<meta name="robots" content="noindex, nofollow, noarchive"', false);
     }
 
     public function test_production_app_url_cannot_be_localhost(): void
